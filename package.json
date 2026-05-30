@@ -1,18 +1,19 @@
 {
-  "name": "murmurarium",
+  "name": "spectral-switchboard",
   "version": "0.1.0",
   "private": true,
-  "description": "A weird Python + JavaScript procedural terrarium.",
+  "description": "A strange Python + JavaScript signal console.",
   "type": "module",
   "scripts": {
     "start": "PYTHONPATH=src python3 -m murmurarium",
     "test": "PYTHONPATH=src python3 -m unittest discover -s tests"
   },
   "keywords": [
-    "generative-art",
+    "generative-audio",
+    "canvas",
     "python",
     "javascript",
-    "canvas"
+    "signal"
   ],
   "license": "MIT"
 }

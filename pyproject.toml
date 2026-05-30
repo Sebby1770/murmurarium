@@ -3,14 +3,14 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "murmurarium"
+name = "spectral-switchboard"
 version = "0.1.0"
-description = "A weird procedural terrarium powered by Python and JavaScript."
+description = "A strange signal console powered by Python and JavaScript."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [{ name = "Sebastian Forbes" }]
-keywords = ["generative-art", "canvas", "python", "javascript", "weird"]
+keywords = ["generative-audio", "canvas", "python", "javascript", "signal"]
 classifiers = [
   "Programming Language :: Python :: 3",
   "Programming Language :: JavaScript",
@@ -19,7 +19,7 @@ classifiers = [
 ]
 
 [project.scripts]
-murmurarium = "murmurarium.server:main"
+spectral-switchboard = "murmurarium.server:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

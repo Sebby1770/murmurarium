@@ -3,55 +3,60 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Murmurarium</title>
+    <title>Spectral Switchboard</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="/styles.css">
   </head>
   <body>
     <main class="app-shell">
-      <section class="stage" aria-label="Murmurarium canvas">
-        <canvas id="murmur-canvas"></canvas>
+      <section class="stage" aria-label="Signal console">
+        <canvas id="signal-canvas"></canvas>
         <div class="readout" aria-live="polite">
-          <p class="kicker">Murmurarium</p>
-          <h1 id="omen">Listening for impossible weather...</h1>
-          <p id="hover-text">Move over a murmur to inspect its tiny opinion.</p>
+          <p class="kicker">Spectral Switchboard</p>
+          <h1 id="decoded">Waiting for the carrier to blink...</h1>
+          <p id="hover-text">Move over a packet to inspect the burst.</p>
         </div>
       </section>
 
-      <aside class="controls" aria-label="Terrarium controls">
+      <aside class="controls" aria-label="Signal controls">
         <label class="field">
-          <span>Seed phrase</span>
-          <input id="seed" type="text" value="static radio in a teacup" autocomplete="off">
+          <span>Station phrase</span>
+          <input id="seed" type="text" value="numbers station for houseplants" autocomplete="off">
         </label>
 
         <div class="control-row">
-          <button id="randomize" type="button">Randomize</button>
-          <button id="sound" type="button" aria-pressed="false">Sound</button>
-          <button id="snapshot" type="button">Snapshot</button>
+          <button id="scan" type="button">Scan</button>
+          <button id="sound" type="button" aria-pressed="false">Audio</button>
+          <button id="capture" type="button">Capture</button>
         </div>
 
         <label class="range-field">
-          <span>Murmurs <strong id="count-value">44</strong></span>
-          <input id="count" type="range" min="8" max="96" value="44">
+          <span>Frequency <strong id="frequency-value">7.13</strong></span>
+          <input id="frequency" type="range" min="1" max="19.9" step="0.01" value="7.13">
         </label>
 
         <label class="range-field">
-          <span>Gravity <strong id="gravity-value">0.62</strong></span>
-          <input id="gravity" type="range" min="0.05" max="1.4" step="0.01" value="0.62">
+          <span>Noise <strong id="noise-value">0.32</strong></span>
+          <input id="noise" type="range" min="0" max="1" step="0.01" value="0.32">
+        </label>
+
+        <label class="range-field">
+          <span>Packets <strong id="packets-value">18</strong></span>
+          <input id="packets" type="range" min="6" max="40" value="18">
         </label>
 
         <dl class="stats">
           <div>
-            <dt>Palette</dt>
-            <dd id="palette">...</dd>
+            <dt>Callsign</dt>
+            <dd id="callsign">...</dd>
           </div>
           <div>
-            <dt>Pulse</dt>
-            <dd id="pulse">...</dd>
+            <dt>Stability</dt>
+            <dd id="stability">...</dd>
           </div>
           <div>
-            <dt>Threads</dt>
-            <dd id="threads">...</dd>
+            <dt>Carrier</dt>
+            <dd id="carrier">...</dd>
           </div>
         </dl>
       </aside>

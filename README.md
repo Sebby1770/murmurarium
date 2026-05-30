@@ -1,18 +1,20 @@
-# Murmurarium
+# Spectral Switchboard
 
-A weird little Python + JavaScript terrarium for procedural "murmurs".
+A strange Python + JavaScript signal console for imaginary radio transmissions.
 
-Python runs the deterministic dream-simulation and serves a tiny JSON API.
-JavaScript paints the organism swarm onto a canvas, lets you mutate the seed,
-and turns the swarm into a small ambient instrument through the Web Audio API.
+Python generates deterministic transmission data from a text seed: waveform
+samples, spectrum bins, packet bursts, callsigns, and decoded nonsense. JavaScript
+turns that into a playable oscilloscope/radar console with live controls, canvas
+rendering, snapshot capture, and optional Web Audio tones.
 
 ## Features
 
 - No external Python runtime dependencies.
-- Deterministic simulation from any text seed.
-- Canvas renderer with hover inspection, controls, and exportable snapshots.
-- Optional Web Audio tones generated from the current swarm.
-- Tests for the simulation and API behavior.
+- Deterministic transmissions from any station phrase.
+- Python JSON API for waveform, spectrum, packet, and callsign data.
+- Canvas oscilloscope, spectrum analyzer, and radar packet display.
+- Optional generated audio based on packet tones.
+- Unit tests for deterministic signal behavior and input clamping.
 
 ## Quick Start
 
@@ -37,27 +39,35 @@ PYTHONPATH=src python -m murmurarium --port 8000
 PYTHONPATH=src python -m unittest discover -s tests
 ```
 
+Or:
+
+```bash
+npm test
+```
+
 ## API
 
 ```text
-GET /api/terrarium?seed=static%20radio&count=42&t=0.8&gravity=0.62
+GET /api/transmission?seed=numbers%20station&frequency=7.13&noise=0.32&packets=18&t=0.8
 ```
 
 Returns:
 
-- `murmurs`: simulated organisms with position, color, tempo, mood, and phrase.
-- `threads`: short connections between nearby murmurs.
-- `weather`: global oddness, pulse, viscosity, and palette data.
+- `signal`: callsign, decoded phrase, carrier, stability, and palette.
+- `waveform`: 160 normalized waveform samples.
+- `spectrum`: amplitude bins for the analyzer view.
+- `packets`: decoded packet bursts with radar position, tone, band, and glyph.
+- `links`: gain-weighted packet connections.
 
 ## Project Shape
 
 ```text
-src/murmurarium/   Python simulation and HTTP server
-web/               JavaScript, CSS, and HTML UI
+src/murmurarium/   Python signal simulation and HTTP server
+web/               JavaScript, CSS, and HTML console UI
 tests/             Python unit tests
 ```
 
 ## Why
 
-Because sometimes a project should feel like a pocket-sized radio telescope
-aimed at a puddle.
+Because it is more fun when a web app feels like tuning into a station that
+should not be broadcasting yet.
