@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "murmurarium"
+version = "0.1.0"
+description = "A weird procedural terrarium powered by Python and JavaScript."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Sebastian Forbes" }]
+keywords = ["generative-art", "canvas", "python", "javascript", "weird"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: JavaScript",
+  "License :: OSI Approved :: MIT License",
+  "Topic :: Artistic Software",
+]
+
+[project.scripts]
+murmurarium = "murmurarium.server:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+murmurarium = []

@@ -1,0 +1,18 @@
+{
+  "name": "murmurarium",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A weird Python + JavaScript procedural terrarium.",
+  "type": "module",
+  "scripts": {
+    "start": "PYTHONPATH=src python3 -m murmurarium",
+    "test": "PYTHONPATH=src python3 -m unittest discover -s tests"
+  },
+  "keywords": [
+    "generative-art",
+    "python",
+    "javascript",
+    "canvas"
+  ],
+  "license": "MIT"
+}
