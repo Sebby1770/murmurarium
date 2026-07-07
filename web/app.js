@@ -62,6 +62,13 @@ const bandPlanList = document.querySelector("#band-plan");
 const leaderboardList = document.querySelector("#leaderboard-list");
 const leaderboardCount = document.querySelector("#leaderboard-count");
 const LEADERBOARD_KEY = "spectral-switchboard-leaderboard";
+const exportWavButton = document.querySelector("#export-wav");
+const dnaHash = document.querySelector("#dna-hash");
+const dnaBars = document.querySelector("#dna-bars");
+const dnaResonance = document.querySelector("#dna-resonance");
+const dnaHybrid = document.querySelector("#dna-hybrid");
+const dreamText = document.querySelector("#dream-text");
+const dreamMood = document.querySelector("#dream-mood");
 
 const stations = [
   "numbers station for houseplants",
@@ -187,6 +194,8 @@ async function loadState(force = false) {
     updateScanLog();
     updateTimeline();
     updateChallenge();
+    updateDna();
+    updateDream();
     updateBandPlan();
     updateSignalTelemetry();
     pushWaterfallRow();
@@ -292,6 +301,26 @@ function updateChallenge() {
   }
 }
 
+function updateDna() {
+  if (!state?.dna) return;
+  dnaHash.textContent = state.dna.hash;
+  dnaResonance.textContent = `${Math.round(state.dna.resonance * 100)}% resonance`;
+  dnaBars.innerHTML = state.dna.bars
+    .map((bar) => `<span style="--h:${bar}"></span>`)
+    .join("");
+  if (state.dna.hybrid?.secondaryHash) {
+    dnaHybrid.textContent = `Hybrid overlap ${state.dna.hybrid.overlap}/6 · score ${Math.round(state.dna.hybrid.score * 100)}%`;
+  } else {
+    dnaHybrid.textContent = "";
+  }
+}
+
+function updateDream() {
+  if (!state?.dream) return;
+  dreamMood.textContent = state.dream.mood;
+  dreamText.textContent = state.dream.text;
+}
+
 function recordTapeFrame() {
   if (!tapeRecordButton || tapeRecordButton.getAttribute("aria-pressed") !== "true" || !state) return;
   tapeFrames.push({
@@ -379,9 +408,34 @@ function draw() {
     drawRadar(width, height);
     if (state.mode === "sstv") drawSstv(width, height);
     drawConstellation(width, height);
+    drawLissajous(width, height);
     renderPhosphor(width, height);
   }
   requestAnimationFrame(draw);
+}
+
+function drawLissajous(width, height) {
+  if (!state?.lissajous?.length) return;
+  const size = Math.min(width, height) * 0.18;
+  const cx = width * 0.18;
+  const cy = height * 0.42;
+  ctx.fillStyle = "rgba(5, 7, 12, 0.62)";
+  ctx.fillRect(cx - size / 2 - 8, cy - size / 2 - 8, size + 16, size + 16);
+  ctx.strokeStyle = alpha(cssVar("--cool"), 0.35);
+  ctx.strokeRect(cx - size / 2 - 8, cy - size / 2 - 8, size + 16, size + 16);
+  ctx.beginPath();
+  state.lissajous.forEach((point, index) => {
+    const x = cx + (point.x - 0.5) * size;
+    const y = cy + (point.y - 0.5) * size;
+    if (index === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  });
+  ctx.strokeStyle = alpha(cssVar("--trace"), 0.82);
+  ctx.lineWidth = 1.6;
+  ctx.stroke();
+  ctx.fillStyle = cssVar("--amber");
+  ctx.font = "700 11px ui-monospace, SFMono-Regular, Menlo, monospace";
+  ctx.fillText("XY", cx - size / 2, cy - size / 2 - 10);
 }
 
 function drawConstellation(width, height) {
@@ -798,6 +852,8 @@ function toggleLiveStream() {
         updateScanLog();
         updateTimeline();
         updateChallenge();
+        updateDna();
+        updateDream();
         updateBandPlan();
         updateSignalTelemetry();
         pushWaterfallRow();
@@ -873,6 +929,51 @@ async function exportJson() {
   link.href = URL.createObjectURL(blob);
   link.click();
   URL.revokeObjectURL(link.href);
+}
+
+function exportWav() {
+  if (!state?.waveform?.length) return;
+  const sampleRate = 8000;
+  const samples = state.waveform.flatMap((sample, index) => {
+    const tone = state.packets[index % state.packets.length]?.tone ?? 60;
+    const hz = 440 * 2 ** ((tone - 69) / 12);
+    const wobble = Math.sin((index / state.waveform.length) * Math.PI * 2 * (hz / 120));
+    return [Math.max(-1, Math.min(1, sample * 0.7 + wobble * 0.25))];
+  });
+  const repeated = [];
+  const stretch = Math.max(1, Math.floor(sampleRate / 40));
+  samples.forEach((sample) => {
+    for (let index = 0; index < stretch; index += 1) repeated.push(sample);
+  });
+  const buffer = new ArrayBuffer(44 + repeated.length * 2);
+  const view = new DataView(buffer);
+  const writeString = (offset, text) => {
+    for (let index = 0; index < text.length; index += 1) {
+      view.setUint8(offset + index, text.charCodeAt(index));
+    }
+  };
+  writeString(0, "RIFF");
+  view.setUint32(4, 36 + repeated.length * 2, true);
+  writeString(8, "WAVE");
+  writeString(12, "fmt ");
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  writeString(36, "data");
+  view.setUint32(40, repeated.length * 2, true);
+  repeated.forEach((sample, index) => {
+    view.setInt16(44 + index * 2, sample * 0x7fff, true);
+  });
+  const link = document.createElement("a");
+  link.download = `spectral-${state.signal.callsign}-${Date.now()}.wav`;
+  link.href = URL.createObjectURL(new Blob([buffer], { type: "audio/wav" }));
+  link.click();
+  URL.revokeObjectURL(link.href);
+  hoverText.textContent = "Carrier exported as WAV.";
 }
 
 function toggleFreeze() {
@@ -1008,6 +1109,7 @@ liveStreamButton.addEventListener("click", toggleLiveStream);
 freezeButton.addEventListener("click", toggleFreeze);
 captureButton.addEventListener("click", capture);
 exportButton.addEventListener("click", exportJson);
+exportWavButton.addEventListener("click", exportWav);
 soundButton.addEventListener("click", toggleSound);
 presetButtons.forEach((button) => button.addEventListener("click", usePreset));
 window.addEventListener("resize", resizeCanvas);
@@ -1030,8 +1132,11 @@ window.addEventListener("keydown", (event) => {
   } else if (key === "c") {
     event.preventDefault();
     capture();
+  } else if (key === "w") {
+    event.preventDefault();
+    exportWav();
   } else if (key === "?") {
-    hoverText.textContent = "Shortcuts: S scan · F freeze · L live · A auto · C capture";
+    hoverText.textContent = "Shortcuts: S scan · F freeze · L live · A auto · C capture · W WAV";
   }
 });
 

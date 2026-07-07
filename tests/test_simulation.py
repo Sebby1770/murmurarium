@@ -69,6 +69,23 @@ class SimulationTests(unittest.TestCase):
         self.assertIn("stars", state["constellation"])
         self.assertIn("edges", state["constellation"])
 
+    def test_dna_dream_and_lissajous_included(self):
+        state = build_transmission(seed="dream dna test")
+        self.assertIn("dna", state)
+        self.assertEqual(len(state["dna"]["codons"]), 6)
+        self.assertIn("dream", state)
+        self.assertIn("text", state["dream"])
+        self.assertGreater(len(state["lissajous"]), 10)
+
+    def test_mixed_transmission_has_hybrid_dna(self):
+        state = build_transmission(
+            seed="alpha station",
+            mix_seed="beta station",
+            mix_amount=0.5,
+        )
+        self.assertIn("hybrid", state["dna"])
+        self.assertIn("secondaryHash", state["dna"]["hybrid"])
+
     def test_analysis_includes_grade_band_plan_and_interference(self):
         state = build_transmission(seed="grade test", packets=20, noise=0.2)
         analysis = state["analysis"]

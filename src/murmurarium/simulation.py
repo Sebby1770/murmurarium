@@ -192,6 +192,9 @@ def _build_transmission_core(
     analysis = _build_analysis(packet_items, spectrum, links, stability)
     challenge = _build_challenge(seed_int, packet_items)
     constellation = _build_constellation(packet_items, links)
+    dna = _build_station_dna(seed, mode, seed_int)
+    dream = _build_dream(rng, packet_items, stability, mode)
+    lissajous = _build_lissajous(waveform, frequency, t)
 
     vu_level = _round(_clamp(stability * 0.6 + average_from_waveform(waveform) * 0.4, 0.0, 1.0))
 
@@ -207,6 +210,9 @@ def _build_transmission_core(
         "analysis": analysis,
         "challenge": challenge,
         "constellation": constellation,
+        "dna": dna,
+        "dream": dream,
+        "lissajous": lissajous,
         "timeline": _build_timeline(seed_int, t, stability, mode),
         "vu": vu_level,
         "signal": {
@@ -282,6 +288,14 @@ def _blend_transmissions(
         f"interfering with {primary['signal']['decoded']}"
     )
     blended["signal"]["stability"] = _round(stability)
+    blended["dna"] = _blend_dna(primary["dna"], secondary["dna"], blend)
+    blended["dream"] = _build_dream(
+        random.Random(seed_to_int(mix_seed) ^ int(blend * 1000)),
+        packet_items,
+        stability,
+        primary["mode"],
+    )
+    blended["lissajous"] = _build_lissajous(waveform, primary["frequency"], 0.0)
     return blended
 
 
@@ -456,6 +470,83 @@ def _packet_band(local: random.Random, mode: str) -> str:
         "sstv": ("slowscan drift", "phosphor wash", "image carrier", "frame bleed"),
     }
     return local.choice(bands.get(mode, ("low velvet", "green carrier", "knife weather", "paper orbit")))
+
+
+def _build_station_dna(seed: str, mode: str, seed_int: int) -> dict[str, Any]:
+    digest = hashlib.sha256(f"{seed}|{mode}|{seed_int}".encode("utf-8")).hexdigest()
+    codons = [digest[index : index + 4] for index in range(0, 24, 4)]
+    bars = [int(codon[:2], 16) / 255 for codon in codons]
+    return {
+        "hash": digest[:16],
+        "codons": codons,
+        "bars": [_round(value) for value in bars],
+        "resonance": _round(sum(bars) / len(bars)),
+    }
+
+
+def _blend_dna(
+    primary: dict[str, Any],
+    secondary: dict[str, Any],
+    blend: float,
+) -> dict[str, Any]:
+    overlap = sum(
+        1 for left, right in zip(primary["codons"], secondary["codons"]) if left == right
+    )
+    hybrid_score = _round(overlap / max(1, len(primary["codons"])) * (1.0 - blend * 0.35))
+    return {
+        "hash": primary["hash"],
+        "codons": primary["codons"],
+        "bars": primary["bars"],
+        "resonance": _round(primary["resonance"] * (1.0 - blend) + secondary["resonance"] * blend),
+        "hybrid": {
+            "secondaryHash": secondary["hash"],
+            "overlap": overlap,
+            "score": hybrid_score,
+        },
+    }
+
+
+def _build_dream(
+    rng: random.Random,
+    packets: list[Packet],
+    stability: float,
+    mode: str,
+) -> dict[str, str | float]:
+    ranked = sorted(packets, key=lambda packet: packet.strength, reverse=True)[:3]
+    fragments = [packet.phrase for packet in ranked] or ["static without a name"]
+    mood = "lucid" if stability > 0.7 else "half-remembered" if stability > 0.4 else "dissolving"
+    verbs = ("whispers", "repeats", "misremembers", "folds into", "borrows")
+    opener = rng.choice(
+        (
+            "In the margin of the carrier,",
+            "Between two impossible stations,",
+            "While the green sweep turns,",
+            "Under a pocket eclipse,",
+        )
+    )
+    body = f"{fragments[0]}, then {rng.choice(verbs)} {fragments[1]}"
+    if len(fragments) > 2:
+        body += f", until {fragments[2]} arrives on {mode} cadence"
+    return {
+        "mood": mood,
+        "text": f"{opener} {body}.",
+        "coherence": _round(stability),
+    }
+
+
+def _build_lissajous(
+    waveform: list[float],
+    frequency: float,
+    t: float,
+) -> list[dict[str, float]]:
+    points: list[dict[str, float]] = []
+    ratio = 1.0 + (frequency % 3) * 0.17
+    for index in range(0, len(waveform) - 1, 3):
+        phase = t * 0.4 + index * 0.08
+        x = math.sin(phase + waveform[index] * math.pi)
+        y = math.sin(phase * ratio + waveform[min(index + 1, len(waveform) - 1)] * math.pi)
+        points.append({"x": _round((x + 1) / 2), "y": _round((y + 1) / 2)})
+    return points[:48]
 
 
 def _build_challenge(seed_int: int, packets: list[Packet]) -> dict[str, Any]:

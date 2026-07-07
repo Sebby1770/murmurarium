@@ -4,4 +4,4 @@ from .simulation import build_transmission
 
 __all__ = ["build_transmission"]
 
-__version__ = "0.5.0"
+__version__ = "0.6.0"

@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.6.0 — 2026-07-07
+
+### Added
+- **Station DNA** fingerprint with codon bars, resonance score, and hybrid overlap when mixing
+- **Dream log** — procedural surreal narratives woven from strongest packet phrases
+- **Lissajous XY scope** mini-plot on the signal canvas
+- **WAV export** — download the current carrier as an 8 kHz audio snippet (`W` shortcut)
+
+### Improved
+- Mixed stations now report DNA hybrid compatibility scores
+
 ## 0.5.0 — 2026-07-07
 
 ### Added
