@@ -27,7 +27,14 @@ PALETTES = (
     ("blackbox candy", "#08060a", "#f8f3d6", "#9cff3b", "#ff7043", "#9a7cff"),
     ("midnight pager", "#05070c", "#7de2d1", "#f3b43f", "#e84a5f", "#eef5db"),
     ("oxide aurora", "#0a0706", "#8fffd2", "#d8ff63", "#ff6b35", "#66a6ff"),
+    ("velvet numbers", "#07050a", "#c8f7ff", "#ffd166", "#ef476f", "#7b9cff"),
+    ("copper static", "#0b0805", "#9ef0c9", "#f4a261", "#e63946", "#8ecae6"),
 )
+
+TRANSMISSION_MODES = ("voice", "numbers", "morse", "hex")
+MORSE_FRAGMENTS = ("... ---", ".-.. .. -- -. /", "-. --- .-. - ....", "... - .- - .. --- -.")
+NUMBER_GROUPS = ("17", "42", "88", "103", "204", "319", "507", "614", "821", "903")
+HEX_FRAGMENTS = ("a4f2", "0d9c", "7b1e", "c0ff", "feed", "b33f", "dead", "cafe")
 
 
 @dataclass(frozen=True)
@@ -62,6 +69,7 @@ def build_transmission(
     noise: float = 0.32,
     packets: int = 18,
     t: float = 0.0,
+    mode: str = "voice",
 ) -> dict[str, Any]:
     """Build a deterministic radio-console state suitable for JSON output."""
 
@@ -69,6 +77,7 @@ def build_transmission(
     frequency = _clamp(float(frequency), 1.0, 19.9)
     noise = _clamp(float(noise), 0.0, 1.0)
     t = float(t)
+    mode = _normalize_mode(mode)
 
     seed_int = seed_to_int(seed)
     rng = random.Random(seed_int)
@@ -79,24 +88,28 @@ def build_transmission(
     carrier = frequency * (1.0 + math.sin(t * 0.17) * 0.006)
 
     packet_items = [
-        _build_packet(seed_int, index, packets, frequency, noise, t)
+        _build_packet(seed_int, index, packets, frequency, noise, t, mode)
         for index in range(packets)
     ]
     waveform = _build_waveform(seed_int, frequency, noise, t)
     spectrum = _build_spectrum(seed_int, frequency, noise, t)
     links = _build_links(packet_items)
+    analysis = _build_analysis(packet_items, spectrum, links, stability)
 
     return {
         "seed": seed or "numbers station for houseplants",
+        "mode": mode,
         "frequency": _round(frequency, 3),
         "noise": _round(noise, 3),
         "packets": [asdict(packet) for packet in packet_items],
         "links": links,
         "waveform": waveform,
         "spectrum": spectrum,
+        "analysis": analysis,
+        "timeline": _build_timeline(seed_int, t, stability, mode),
         "signal": {
             "callsign": callsign,
-            "decoded": _decoded_sentence(seed, rng, phase, stability),
+            "decoded": _decoded_sentence(seed, rng, phase, stability, mode),
             "phase": _round(phase, 4),
             "stability": _round(stability, 4),
             "carrier": _round(carrier, 4),
@@ -119,6 +132,7 @@ def _build_packet(
     frequency: float,
     noise: float,
     t: float,
+    mode: str,
 ) -> Packet:
     local = random.Random(seed_int + index * 65_537)
     ring = 0.18 + (index % 5) * 0.075 + local.random() * 0.045
@@ -129,8 +143,8 @@ def _build_packet(
     strength = _clamp(local.uniform(0.38, 0.95) * (1.0 - noise * 0.36), 0.08, 1.0)
     tone = 38 + int((frequency * 3 + index * 5 + local.randrange(18)) % 34)
     label = f"{local.choice(CALLSIGN_PREFIXES)}-{index + local.randrange(11, 98):02d}"
-    phrase = f"{local.choice(SIGNAL_VERBS)} {local.choice(SIGNAL_OBJECTS)}"
-    band = local.choice(("low velvet", "green carrier", "knife weather", "paper orbit"))
+    phrase = _packet_phrase(local, mode, index)
+    band = _packet_band(local, mode)
     return Packet(
         id=f"p{index:02d}",
         glyph=local.choice(GLYPHS),
@@ -192,6 +206,36 @@ def _build_links(packets: list[Packet]) -> list[dict[str, Any]]:
     return sorted(links, key=lambda link: link["gain"], reverse=True)[:80]
 
 
+def _build_analysis(
+    packets: list[Packet],
+    spectrum: list[dict[str, float]],
+    links: list[dict[str, Any]],
+    stability: float,
+) -> dict[str, Any]:
+    strongest_packet = max(packets, key=lambda packet: packet.strength)
+    dominant_bin = max(spectrum, key=lambda item: item["amp"])
+    average_strength = sum(packet.strength for packet in packets) / len(packets)
+    average_drift = sum(abs(packet.drift) for packet in packets) / len(packets)
+    link_density = len(links) / max(1, len(packets))
+    coherence = _clamp(stability * 0.72 + average_strength * 0.2 + min(link_density, 1.0) * 0.08, 0.0, 1.0)
+
+    return {
+        "strongestPacket": {
+            "id": strongest_packet.id,
+            "label": strongest_packet.label,
+            "strength": strongest_packet.strength,
+            "tone": strongest_packet.tone,
+        },
+        "dominantFrequency": dominant_bin["hz"],
+        "dominantAmplitude": dominant_bin["amp"],
+        "averageStrength": _round(average_strength),
+        "averageDrift": _round(average_drift),
+        "linkCount": len(links),
+        "linkDensity": _round(link_density),
+        "coherence": _round(coherence),
+    }
+
+
 def _callsign(rng: random.Random, seed_int: int) -> str:
     prefix = rng.choice(CALLSIGN_PREFIXES)
     digits = str(seed_int % 997).zfill(3)
@@ -199,7 +243,62 @@ def _callsign(rng: random.Random, seed_int: int) -> str:
     return f"{prefix}-{digits}-{suffix}"
 
 
-def _decoded_sentence(seed: str, rng: random.Random, phase: float, stability: float) -> str:
+def _normalize_mode(mode: str) -> str:
+    normalized = (mode or "voice").strip().lower()
+    return normalized if normalized in TRANSMISSION_MODES else "voice"
+
+
+def _packet_phrase(local: random.Random, mode: str, index: int) -> str:
+    if mode == "numbers":
+        group = " ".join(local.sample(NUMBER_GROUPS, k=3))
+        return f"group {group}"
+    if mode == "morse":
+        return local.choice(MORSE_FRAGMENTS)
+    if mode == "hex":
+        return " ".join(local.sample(HEX_FRAGMENTS, k=4))
+    return f"{local.choice(SIGNAL_VERBS)} {local.choice(SIGNAL_OBJECTS)}"
+
+
+def _packet_band(local: random.Random, mode: str) -> str:
+    bands = {
+        "numbers": ("counted carrier", "group repeat", "cipher cadence", "station math"),
+        "morse": ("dash weather", "dot lattice", "keyer drift", "relay echo"),
+        "hex": ("dump stream", "nibble rain", "opcode haze", "checksum glow"),
+    }
+    return local.choice(bands.get(mode, ("low velvet", "green carrier", "knife weather", "paper orbit")))
+
+
+def _build_timeline(seed_int: int, t: float, stability: float, mode: str) -> list[dict[str, float | str]]:
+    rng = random.Random(seed_int ^ int(t * 1000))
+    points: list[dict[str, float | str]] = []
+    for index in range(8):
+        stamp = _round(max(0.0, t - (7 - index) * 0.42), 2)
+        points.append(
+            {
+                "t": stamp,
+                "coherence": _round(_clamp(stability + rng.uniform(-0.12, 0.12), 0.0, 1.0)),
+                "mode": mode,
+            }
+        )
+    return points
+
+
+def _decoded_sentence(
+    seed: str,
+    rng: random.Random,
+    phase: float,
+    stability: float,
+    mode: str,
+) -> str:
+    if mode == "numbers":
+        groups = " ".join(rng.sample(NUMBER_GROUPS, k=5))
+        return f"Numbers: {groups} — repeat, then wait for the green sweep."
+    if mode == "morse":
+        fragment = rng.choice(MORSE_FRAGMENTS)
+        return f"Morse: {fragment} — keying at {rng.randint(12, 22)} WPM beneath the carrier."
+    if mode == "hex":
+        dump = " ".join(rng.sample(HEX_FRAGMENTS, k=6))
+        return f"Hex dump: {dump} — checksum unstable at {int(stability * 100)}%."
     object_name = rng.choice(SIGNAL_OBJECTS)
     verb = rng.choice(SIGNAL_VERBS)
     if stability < 0.35:

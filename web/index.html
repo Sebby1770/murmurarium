@@ -19,15 +19,43 @@
       </section>
 
       <aside class="controls" aria-label="Signal controls">
+        <header class="panel-header">
+          <div>
+            <p class="kicker">Receiver</p>
+            <h2>Live Signal Desk</h2>
+          </div>
+          <span id="palette-name" class="status-pill">tuning</span>
+        </header>
+
         <label class="field">
           <span>Station phrase</span>
           <input id="seed" type="text" value="numbers station for houseplants" autocomplete="off">
         </label>
 
+        <label class="field">
+          <span>Transmission mode</span>
+          <select id="mode">
+            <option value="voice">Voice decode</option>
+            <option value="numbers">Numbers station</option>
+            <option value="morse">Morse relay</option>
+            <option value="hex">Hex dump</option>
+          </select>
+        </label>
+
+        <div class="preset-grid" aria-label="Station presets">
+          <button class="preset" type="button" data-seed="numbers station for houseplants" data-frequency="7.13" data-noise="0.32" data-packets="18" data-mode="voice">Garden</button>
+          <button class="preset" type="button" data-seed="midnight kettle on channel nine" data-frequency="11.41" data-noise="0.18" data-packets="24" data-mode="morse">Midnight</button>
+          <button class="preset" type="button" data-seed="secret weather from the laundromat" data-frequency="4.72" data-noise="0.61" data-packets="30" data-mode="numbers">Weather</button>
+          <button class="preset" type="button" data-seed="lost pager under the pier" data-frequency="14.2" data-noise="0.44" data-packets="22" data-mode="hex">Cipher</button>
+        </div>
+
         <div class="control-row">
           <button id="scan" type="button">Scan</button>
+          <button id="freeze" type="button" aria-pressed="false">Freeze</button>
           <button id="sound" type="button" aria-pressed="false">Audio</button>
           <button id="capture" type="button">Capture</button>
+          <button id="export-json" type="button">JSON</button>
+          <button id="share" type="button">Share</button>
         </div>
 
         <label class="range-field">
@@ -59,6 +87,49 @@
             <dd id="carrier">...</dd>
           </div>
         </dl>
+
+        <section class="telemetry" aria-label="Signal telemetry">
+          <div>
+            <span>Coherence</span>
+            <strong id="coherence">...</strong>
+          </div>
+          <div>
+            <span>Links</span>
+            <strong id="link-count">...</strong>
+          </div>
+          <div>
+            <span>Dominant</span>
+            <strong id="dominant-frequency">...</strong>
+          </div>
+          <div>
+            <span>Strongest</span>
+            <strong id="strongest-packet">...</strong>
+          </div>
+        </section>
+
+        <section class="packet-panel" aria-label="Strong packet list">
+          <div class="section-title">
+            <h3>Packet Stack</h3>
+            <span id="packet-count">0 bursts</span>
+          </div>
+          <ol id="packet-list" class="packet-list"></ol>
+        </section>
+
+        <section class="timeline-panel" aria-label="Signal timeline">
+          <div class="section-title">
+            <h3>Tape Timeline</h3>
+            <span id="timeline-mode">voice</span>
+          </div>
+          <div id="timeline" class="timeline"></div>
+        </section>
+
+        <section class="log-panel" aria-label="Scan log">
+          <div class="section-title">
+            <h3>Scan Log</h3>
+            <span id="scan-count">0</span>
+          </div>
+          <ul id="scan-log" class="scan-log"></ul>
+        </section>
       </aside>
     </main>
 

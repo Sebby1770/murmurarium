@@ -32,7 +32,7 @@ class SignalLabHandler(SimpleHTTPRequestHandler):
             self._handle_transmission(parsed.query)
             return
         if parsed.path == "/health":
-            self._send_json({"ok": True, "name": "spectral-switchboard"})
+            self._send_json({"ok": True, "name": "spectral-switchboard", "version": "0.2.0"})
             return
         super().do_GET()
 
@@ -43,6 +43,7 @@ class SignalLabHandler(SimpleHTTPRequestHandler):
         frequency = _parse_float(params.get("frequency", ["7.13"])[0], default=7.13)
         noise = _parse_float(params.get("noise", ["0.32"])[0], default=0.32)
         t = _parse_float(params.get("t", ["0"])[0], default=0.0)
+        mode = params.get("mode", ["voice"])[0]
         self._send_json(
             build_transmission(
                 seed=seed,
@@ -50,6 +51,7 @@ class SignalLabHandler(SimpleHTTPRequestHandler):
                 frequency=frequency,
                 noise=noise,
                 t=t,
+                mode=mode,
             )
         )
 

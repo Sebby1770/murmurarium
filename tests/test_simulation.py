@@ -29,8 +29,26 @@ class SimulationTests(unittest.TestCase):
         state = build_transmission(seed="json", packets=12)
         self.assertEqual(len(state["waveform"]), 160)
         self.assertEqual(len(state["spectrum"]), 36)
+        self.assertIn("analysis", state)
+        self.assertIn("dominantFrequency", state["analysis"])
+        self.assertIn("strongestPacket", state["analysis"])
         self.assertIn("Decoded:", state["signal"]["decoded"])
         self.assertIn("packets", json.dumps(state))
+
+    def test_transmission_modes_change_decoded_output(self):
+        voice = build_transmission(seed="mode test", mode="voice")
+        numbers = build_transmission(seed="mode test", mode="numbers")
+        morse = build_transmission(seed="mode test", mode="morse")
+        hex_mode = build_transmission(seed="mode test", mode="hex")
+        self.assertTrue(voice["signal"]["decoded"].startswith("Decoded:"))
+        self.assertTrue(numbers["signal"]["decoded"].startswith("Numbers:"))
+        self.assertTrue(morse["signal"]["decoded"].startswith("Morse:"))
+        self.assertTrue(hex_mode["signal"]["decoded"].startswith("Hex dump:"))
+        self.assertEqual(len(voice["timeline"]), 8)
+
+    def test_invalid_mode_falls_back_to_voice(self):
+        state = build_transmission(seed="fallback", mode="satellite")
+        self.assertEqual(state["mode"], "voice")
 
     def test_server_handler_is_available(self):
         self.assertEqual(SignalLabHandler.__module__, "murmurarium.server")
