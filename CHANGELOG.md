@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.3.0 — 2026-07-07
+
+### Added
+- **Station mixing**: blend a second station phrase with adjustable interference amount
+- **SSTV slowscan mode** with dedicated decode output and scanline visualization
+- **SSE stream endpoint** (`/api/stream`) for server-pushed signal updates
+- **Phosphor persistence** canvas layer for CRT-style trails
+- **VU meter** tied to signal level
+- **Station gallery** saved to localStorage with one-click recall
+- **Fullscreen** stage mode
+
+### Improved
+- Mix-aware analysis metadata (`mixAmount`, `mixSeed`)
+- Shareable URL state now includes mix parameters
+
 ## 0.2.0 — 2026-07-07
 
 ### Added

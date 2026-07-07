@@ -31,7 +31,7 @@ PALETTES = (
     ("copper static", "#0b0805", "#9ef0c9", "#f4a261", "#e63946", "#8ecae6"),
 )
 
-TRANSMISSION_MODES = ("voice", "numbers", "morse", "hex")
+TRANSMISSION_MODES = ("voice", "numbers", "morse", "hex", "sstv")
 MORSE_FRAGMENTS = ("... ---", ".-.. .. -- -. /", "-. --- .-. - ....", "... - .- - .. --- -.")
 NUMBER_GROUPS = ("17", "42", "88", "103", "204", "319", "507", "614", "821", "903")
 HEX_FRAGMENTS = ("a4f2", "0d9c", "7b1e", "c0ff", "feed", "b33f", "dead", "cafe")
@@ -70,9 +70,42 @@ def build_transmission(
     packets: int = 18,
     t: float = 0.0,
     mode: str = "voice",
+    mix_seed: str = "",
+    mix_amount: float = 0.0,
 ) -> dict[str, Any]:
     """Build a deterministic radio-console state suitable for JSON output."""
 
+    primary = _build_transmission_core(
+        seed=seed,
+        frequency=frequency,
+        noise=noise,
+        packets=packets,
+        t=t,
+        mode=mode,
+    )
+    mix_amount = _clamp(float(mix_amount), 0.0, 1.0)
+    if mix_amount <= 0.01 or not (mix_seed or "").strip():
+        return primary
+
+    secondary = _build_transmission_core(
+        seed=mix_seed,
+        frequency=frequency * (1.0 + mix_amount * 0.08),
+        noise=min(1.0, noise + mix_amount * 0.18),
+        packets=packets,
+        t=t,
+        mode=mode,
+    )
+    return _blend_transmissions(primary, secondary, mix_amount, mix_seed)
+
+
+def _build_transmission_core(
+    seed: str,
+    frequency: float,
+    noise: float,
+    packets: int,
+    t: float,
+    mode: str,
+) -> dict[str, Any]:
     packets = int(_clamp(packets, 6, 40))
     frequency = _clamp(float(frequency), 1.0, 19.9)
     noise = _clamp(float(noise), 0.0, 1.0)
@@ -96,6 +129,8 @@ def build_transmission(
     links = _build_links(packet_items)
     analysis = _build_analysis(packet_items, spectrum, links, stability)
 
+    vu_level = _round(_clamp(stability * 0.6 + average_from_waveform(waveform) * 0.4, 0.0, 1.0))
+
     return {
         "seed": seed or "numbers station for houseplants",
         "mode": mode,
@@ -107,6 +142,7 @@ def build_transmission(
         "spectrum": spectrum,
         "analysis": analysis,
         "timeline": _build_timeline(seed_int, t, stability, mode),
+        "vu": vu_level,
         "signal": {
             "callsign": callsign,
             "decoded": _decoded_sentence(seed, rng, phase, stability, mode),
@@ -123,6 +159,70 @@ def build_transmission(
             },
         },
     }
+
+
+def _blend_transmissions(
+    primary: dict[str, Any],
+    secondary: dict[str, Any],
+    mix_amount: float,
+    mix_seed: str,
+) -> dict[str, Any]:
+    blend = _clamp(mix_amount, 0.0, 1.0)
+    inverse = 1.0 - blend
+    waveform = [
+        _round(primary["waveform"][index] * inverse + secondary["waveform"][index] * blend)
+        for index in range(len(primary["waveform"]))
+    ]
+    spectrum = [
+        {
+            "hz": primary["spectrum"][index]["hz"],
+            "amp": _round(
+                primary["spectrum"][index]["amp"] * inverse
+                + secondary["spectrum"][index]["amp"] * blend
+            ),
+        }
+        for index in range(len(primary["spectrum"]))
+    ]
+    merged_packets = primary["packets"][: max(6, int(len(primary["packets"]) * inverse))]
+    secondary_packets = secondary["packets"][: max(4, int(len(secondary["packets"]) * blend))]
+    for index, packet in enumerate(secondary_packets):
+        merged = dict(packet)
+        merged["id"] = f"m{index:02d}"
+        merged["strength"] = _round(packet["strength"] * blend)
+        merged_packets.append(merged)
+
+    stability = _clamp(
+        primary["signal"]["stability"] * inverse + secondary["signal"]["stability"] * blend,
+        0.05,
+        1.0,
+    )
+    packet_items = [Packet(**packet) for packet in merged_packets]
+    links = _build_links(packet_items)
+    analysis = _build_analysis(packet_items, spectrum, links, stability)
+    analysis["mixAmount"] = _round(blend)
+    analysis["mixSeed"] = mix_seed.strip()
+
+    blended = dict(primary)
+    blended["waveform"] = waveform
+    blended["spectrum"] = spectrum
+    blended["packets"] = merged_packets
+    blended["links"] = links
+    blended["analysis"] = analysis
+    blended["vu"] = _round(_clamp(stability * 0.65 + average_from_waveform(waveform) * 0.35, 0.0, 1.0))
+    blended["mix"] = {"seed": mix_seed.strip(), "amount": _round(blend)}
+    blended["signal"] = dict(primary["signal"])
+    blended["signal"]["decoded"] = (
+        f"Mixed ({int(blend * 100)}%): {secondary['signal']['decoded']} "
+        f"interfering with {primary['signal']['decoded']}"
+    )
+    blended["signal"]["stability"] = _round(stability)
+    return blended
+
+
+def average_from_waveform(waveform: list[float]) -> float:
+    if not waveform:
+        return 0.0
+    return sum(abs(sample) for sample in waveform) / len(waveform)
 
 
 def _build_packet(
@@ -256,6 +356,9 @@ def _packet_phrase(local: random.Random, mode: str, index: int) -> str:
         return local.choice(MORSE_FRAGMENTS)
     if mode == "hex":
         return " ".join(local.sample(HEX_FRAGMENTS, k=4))
+    if mode == "sstv":
+        lines = ("scanline", "phosphor row", "image burst", "slowvision frame")
+        return f"{local.choice(lines)} {index + local.randrange(1, 99):02d}"
     return f"{local.choice(SIGNAL_VERBS)} {local.choice(SIGNAL_OBJECTS)}"
 
 
@@ -264,6 +367,7 @@ def _packet_band(local: random.Random, mode: str) -> str:
         "numbers": ("counted carrier", "group repeat", "cipher cadence", "station math"),
         "morse": ("dash weather", "dot lattice", "keyer drift", "relay echo"),
         "hex": ("dump stream", "nibble rain", "opcode haze", "checksum glow"),
+        "sstv": ("slowscan drift", "phosphor wash", "image carrier", "frame bleed"),
     }
     return local.choice(bands.get(mode, ("low velvet", "green carrier", "knife weather", "paper orbit")))
 
@@ -299,6 +403,11 @@ def _decoded_sentence(
     if mode == "hex":
         dump = " ".join(rng.sample(HEX_FRAGMENTS, k=6))
         return f"Hex dump: {dump} — checksum unstable at {int(stability * 100)}%."
+    if mode == "sstv":
+        return (
+            f"SSTV frame: {rng.randint(120, 320)} lines at {rng.randint(8, 16)}s — "
+            f"ghost image forming at {int(stability * 100)}% lock."
+        )
     object_name = rng.choice(SIGNAL_OBJECTS)
     verb = rng.choice(SIGNAL_VERBS)
     if stability < 0.35:

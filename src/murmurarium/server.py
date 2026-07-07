@@ -7,6 +7,7 @@ from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 import json
 from pathlib import Path
+import time
 from urllib.parse import parse_qs, urlparse
 
 from .simulation import build_transmission
@@ -31,8 +32,11 @@ class SignalLabHandler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/transmission":
             self._handle_transmission(parsed.query)
             return
+        if parsed.path == "/api/stream":
+            self._handle_stream(parsed.query)
+            return
         if parsed.path == "/health":
-            self._send_json({"ok": True, "name": "spectral-switchboard", "version": "0.2.0"})
+            self._send_json({"ok": True, "name": "spectral-switchboard", "version": "0.3.0"})
             return
         super().do_GET()
 
@@ -44,6 +48,8 @@ class SignalLabHandler(SimpleHTTPRequestHandler):
         noise = _parse_float(params.get("noise", ["0.32"])[0], default=0.32)
         t = _parse_float(params.get("t", ["0"])[0], default=0.0)
         mode = params.get("mode", ["voice"])[0]
+        mix_seed = params.get("mix_seed", [""])[0]
+        mix_amount = _parse_float(params.get("mix_amount", ["0"])[0], default=0.0)
         self._send_json(
             build_transmission(
                 seed=seed,
@@ -52,8 +58,50 @@ class SignalLabHandler(SimpleHTTPRequestHandler):
                 noise=noise,
                 t=t,
                 mode=mode,
+                mix_seed=mix_seed,
+                mix_amount=mix_amount,
             )
         )
+
+    def _handle_stream(self, query: str) -> None:
+        params = parse_qs(query)
+        seed = params.get("seed", ["numbers station for houseplants"])[0]
+        packets = _parse_int(params.get("packets", ["18"])[0], default=18)
+        frequency = _parse_float(params.get("frequency", ["7.13"])[0], default=7.13)
+        noise = _parse_float(params.get("noise", ["0.32"])[0], default=0.32)
+        mode = params.get("mode", ["voice"])[0]
+        mix_seed = params.get("mix_seed", [""])[0]
+        mix_amount = _parse_float(params.get("mix_amount", ["0"])[0], default=0.0)
+        interval = _parse_float(params.get("interval", ["0.5"])[0], default=0.5)
+        interval = max(0.2, min(interval, 2.0))
+
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+        self.send_header("Cache-Control", "no-cache")
+        self.send_header("Connection", "keep-alive")
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.end_headers()
+
+        started = time.monotonic()
+        try:
+            while True:
+                elapsed = time.monotonic() - started
+                payload = build_transmission(
+                    seed=seed,
+                    packets=packets,
+                    frequency=frequency,
+                    noise=noise,
+                    t=elapsed,
+                    mode=mode,
+                    mix_seed=mix_seed,
+                    mix_amount=mix_amount,
+                )
+                event = f"data: {json.dumps(payload, separators=(',', ':'))}\n\n"
+                self.wfile.write(event.encode("utf-8"))
+                self.wfile.flush()
+                time.sleep(interval)
+        except (BrokenPipeError, ConnectionResetError):
+            return
 
     def _send_json(self, payload: dict[str, object]) -> None:
         body = json.dumps(payload, indent=2).encode("utf-8")

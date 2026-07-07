@@ -51,12 +51,76 @@ input {
   border-right: 1px solid var(--line);
 }
 
+#phosphor-canvas,
 #signal-canvas {
+  position: absolute;
+  inset: 0;
   display: block;
   width: 100%;
   height: 100%;
   min-height: 100vh;
+}
+
+#phosphor-canvas {
+  pointer-events: none;
+  opacity: 0.55;
+}
+
+#signal-canvas {
   background: var(--bg);
+}
+
+.vu-meter {
+  position: absolute;
+  right: 1rem;
+  top: 1rem;
+  width: 0.65rem;
+  height: 8rem;
+  border: 1px solid rgba(124, 255, 196, 0.35);
+  border-radius: 4px;
+  background: rgba(5, 7, 12, 0.7);
+  overflow: hidden;
+}
+
+.vu-fill {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 0%;
+  background: linear-gradient(180deg, var(--trace), var(--amber), var(--hot));
+  transition: height 180ms ease;
+}
+
+.gallery-list {
+  display: grid;
+  gap: 0.45rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.gallery-list li {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.gallery-list button {
+  text-align: left;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: rgba(248, 243, 214, 0.04);
+  color: var(--paper);
+  cursor: pointer;
+}
+
+.gallery-list span {
+  color: var(--muted);
+  font-size: 0.75rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .readout {

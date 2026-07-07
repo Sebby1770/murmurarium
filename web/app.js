@@ -1,5 +1,7 @@
 const canvas = document.querySelector("#signal-canvas");
 const ctx = canvas.getContext("2d");
+const phosphorCanvas = document.querySelector("#phosphor-canvas");
+const phosphorCtx = phosphorCanvas.getContext("2d");
 const seedInput = document.querySelector("#seed");
 const frequencyInput = document.querySelector("#frequency");
 const noiseInput = document.querySelector("#noise");
@@ -31,6 +33,15 @@ const modeInput = document.querySelector("#mode");
 const timelinePanel = document.querySelector("#timeline");
 const timelineMode = document.querySelector("#timeline-mode");
 const presetButtons = document.querySelectorAll(".preset");
+const mixSeedInput = document.querySelector("#mix-seed");
+const mixAmountInput = document.querySelector("#mix-amount");
+const mixValue = document.querySelector("#mix-value");
+const vuFill = document.querySelector("#vu-fill");
+const fullscreenButton = document.querySelector("#fullscreen");
+const gallerySaveButton = document.querySelector("#gallery-save");
+const galleryList = document.querySelector("#gallery-list");
+const galleryCount = document.querySelector("#gallery-count");
+const GALLERY_KEY = "spectral-switchboard-gallery";
 
 const stations = [
   "numbers station for houseplants",
@@ -53,9 +64,26 @@ let scanHistory = [];
 function resizeCanvas() {
   const rect = canvas.getBoundingClientRect();
   const ratio = Math.max(1, window.devicePixelRatio || 1);
-  canvas.width = Math.round(rect.width * ratio);
-  canvas.height = Math.round(rect.height * ratio);
+  const width = Math.round(rect.width * ratio);
+  const height = Math.round(rect.height * ratio);
+  canvas.width = width;
+  canvas.height = height;
+  phosphorCanvas.width = width;
+  phosphorCanvas.height = height;
   ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+  phosphorCtx.setTransform(ratio, 0, 0, ratio, 0, 0);
+}
+
+function renderPhosphor(width, height) {
+  phosphorCtx.globalAlpha = 0.88;
+  phosphorCtx.drawImage(canvas, 0, 0, width, height);
+  phosphorCtx.globalAlpha = 0.14;
+  phosphorCtx.fillStyle = "#05070c";
+  phosphorCtx.fillRect(0, 0, width, height);
+  phosphorCtx.globalAlpha = 1;
+  ctx.globalAlpha = 0.42;
+  ctx.drawImage(phosphorCanvas, 0, 0, width, height);
+  ctx.globalAlpha = 1;
 }
 
 function apiUrl(now) {
@@ -65,6 +93,8 @@ function apiUrl(now) {
     noise: noiseInput.value,
     packets: packetsInput.value,
     mode: modeInput.value,
+    mix_seed: mixSeedInput.value,
+    mix_amount: mixAmountInput.value,
     t: String(((now - start) / 1000).toFixed(3)),
   });
   return `/api/transmission?${params.toString()}`;
@@ -77,6 +107,8 @@ function syncUrlState() {
     noise: noiseInput.value,
     packets: packetsInput.value,
     mode: modeInput.value,
+    mix_seed: mixSeedInput.value,
+    mix_amount: mixAmountInput.value,
   });
   const next = `#${params.toString()}`;
   if (window.location.hash !== next) {
@@ -91,6 +123,8 @@ function loadUrlState() {
   if (params.get("noise")) noiseInput.value = params.get("noise");
   if (params.get("packets")) packetsInput.value = params.get("packets");
   if (params.get("mode")) modeInput.value = params.get("mode");
+  if (params.get("mix_seed")) mixSeedInput.value = params.get("mix_seed");
+  if (params.get("mix_amount")) mixAmountInput.value = params.get("mix_amount");
 }
 
 async function loadState(force = false) {
@@ -130,6 +164,7 @@ function updateControlLabels() {
   frequencyValue.textContent = Number(frequencyInput.value).toFixed(2);
   noiseValue.textContent = Number(noiseInput.value).toFixed(2);
   packetsValue.textContent = packetsInput.value;
+  mixValue.textContent = Number(mixAmountInput.value).toFixed(2);
 }
 
 function updateLabels() {
@@ -142,6 +177,9 @@ function updateLabels() {
   linkCountLabel.textContent = String(state.analysis.linkCount);
   dominantFrequencyLabel.textContent = `${Number(state.analysis.dominantFrequency).toFixed(2)} Hz`;
   strongestPacketLabel.textContent = state.analysis.strongestPacket.label;
+  if (state.vu != null) {
+    vuFill.style.height = `${Math.round(state.vu * 100)}%`;
+  }
 }
 
 function updatePacketList() {
@@ -216,8 +254,28 @@ function draw() {
     drawWaveform(width, height);
     drawSpectrum(width, height);
     drawRadar(width, height);
+    if (state.mode === "sstv") drawSstv(width, height);
+    renderPhosphor(width, height);
   }
   requestAnimationFrame(draw);
+}
+
+function drawSstv(width, height) {
+  const left = width * 0.08;
+  const top = height * 0.62;
+  const frameWidth = width * 0.34;
+  const frameHeight = height * 0.22;
+  const lines = 18;
+  ctx.fillStyle = "rgba(5, 7, 12, 0.72)";
+  ctx.fillRect(left, top, frameWidth, frameHeight);
+  ctx.strokeStyle = alpha(cssVar("--amber"), 0.5);
+  ctx.strokeRect(left, top, frameWidth, frameHeight);
+  for (let line = 0; line < lines; line += 1) {
+    const y = top + (line / lines) * frameHeight;
+    const drift = Math.sin(performance.now() / 900 + line * 0.4) * 0.5;
+    ctx.fillStyle = line % 2 === 0 ? alpha(cssVar("--trace"), 0.35) : alpha(cssVar("--hot"), 0.22);
+    ctx.fillRect(left + 4, y + drift, frameWidth - 8, Math.max(1.5, frameHeight / lines - 1));
+  }
 }
 
 function drawConsole(width, height) {
@@ -401,6 +459,72 @@ function usePreset(event) {
   loadState(true);
 }
 
+function loadGallery() {
+  try {
+    return JSON.parse(localStorage.getItem(GALLERY_KEY) || "[]");
+  } catch {
+    return [];
+  }
+}
+
+function renderGallery() {
+  const items = loadGallery();
+  galleryCount.textContent = `${items.length} saved`;
+  galleryList.innerHTML = items
+    .map(
+      (item, index) => `
+        <li>
+          <button type="button" data-index="${index}" class="gallery-load">${item.callsign}</button>
+          <span>${item.seed}</span>
+        </li>
+      `
+    )
+    .join("");
+  galleryList.querySelectorAll(".gallery-load").forEach((button) => {
+    button.addEventListener("click", () => {
+      const entry = items[Number(button.dataset.index)];
+      if (!entry) return;
+      seedInput.value = entry.seed;
+      frequencyInput.value = entry.frequency;
+      noiseInput.value = entry.noise;
+      packetsInput.value = entry.packets;
+      modeInput.value = entry.mode;
+      mixSeedInput.value = entry.mix_seed || "";
+      mixAmountInput.value = entry.mix_amount || "0";
+      start = performance.now();
+      loadState(true);
+    });
+  });
+}
+
+function saveToGallery() {
+  if (!state) return;
+  const items = loadGallery();
+  items.unshift({
+    callsign: state.signal.callsign,
+    seed: seedInput.value,
+    frequency: frequencyInput.value,
+    noise: noiseInput.value,
+    packets: packetsInput.value,
+    mode: modeInput.value,
+    mix_seed: mixSeedInput.value,
+    mix_amount: mixAmountInput.value,
+    savedAt: Date.now(),
+  });
+  localStorage.setItem(GALLERY_KEY, JSON.stringify(items.slice(0, 12)));
+  renderGallery();
+  hoverText.textContent = "Station saved to local gallery.";
+}
+
+function toggleFullscreen() {
+  const target = document.querySelector(".stage");
+  if (!document.fullscreenElement) {
+    target.requestFullscreen?.();
+  } else {
+    document.exitFullscreen?.();
+  }
+}
+
 async function shareStation() {
   syncUrlState();
   const url = `${window.location.origin}${window.location.pathname}${window.location.hash}`;
@@ -532,8 +656,12 @@ frequencyInput.addEventListener("input", () => loadState(true));
 noiseInput.addEventListener("input", () => loadState(true));
 packetsInput.addEventListener("input", () => loadState(true));
 modeInput.addEventListener("change", () => loadState(true));
+mixSeedInput.addEventListener("input", () => loadState(true));
+mixAmountInput.addEventListener("input", () => loadState(true));
 scanButton.addEventListener("click", scan);
 shareButton.addEventListener("click", shareStation);
+fullscreenButton.addEventListener("click", toggleFullscreen);
+gallerySaveButton.addEventListener("click", saveToGallery);
 freezeButton.addEventListener("click", toggleFreeze);
 captureButton.addEventListener("click", capture);
 exportButton.addEventListener("click", exportJson);
@@ -544,5 +672,6 @@ window.addEventListener("resize", resizeCanvas);
 setInterval(() => loadState(false), 560);
 resizeCanvas();
 loadUrlState();
+renderGallery();
 loadState(true);
 draw();

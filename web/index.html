@@ -10,7 +10,11 @@
   <body>
     <main class="app-shell">
       <section class="stage" aria-label="Signal console">
+        <canvas id="phosphor-canvas" aria-hidden="true"></canvas>
         <canvas id="signal-canvas"></canvas>
+        <div class="vu-meter" aria-hidden="true">
+          <div id="vu-fill" class="vu-fill"></div>
+        </div>
         <div class="readout" aria-live="polite">
           <p class="kicker">Spectral Switchboard</p>
           <h1 id="decoded">Waiting for the carrier to blink...</h1>
@@ -39,7 +43,18 @@
             <option value="numbers">Numbers station</option>
             <option value="morse">Morse relay</option>
             <option value="hex">Hex dump</option>
+            <option value="sstv">SSTV slowscan</option>
           </select>
+        </label>
+
+        <label class="field">
+          <span>Mix station (interference)</span>
+          <input id="mix-seed" type="text" placeholder="Optional second station phrase" autocomplete="off">
+        </label>
+
+        <label class="range-field">
+          <span>Mix amount <strong id="mix-value">0.00</strong></span>
+          <input id="mix-amount" type="range" min="0" max="1" step="0.01" value="0">
         </label>
 
         <div class="preset-grid" aria-label="Station presets">
@@ -56,7 +71,17 @@
           <button id="capture" type="button">Capture</button>
           <button id="export-json" type="button">JSON</button>
           <button id="share" type="button">Share</button>
+          <button id="fullscreen" type="button">Full</button>
+          <button id="gallery-save" type="button">Save</button>
         </div>
+
+        <section class="gallery-panel" aria-label="Station gallery">
+          <div class="section-title">
+            <h3>Gallery</h3>
+            <span id="gallery-count">0 saved</span>
+          </div>
+          <ul id="gallery-list" class="gallery-list"></ul>
+        </section>
 
         <label class="range-field">
           <span>Frequency <strong id="frequency-value">7.13</strong></span>

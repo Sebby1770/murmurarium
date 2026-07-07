@@ -50,6 +50,18 @@ class SimulationTests(unittest.TestCase):
         state = build_transmission(seed="fallback", mode="satellite")
         self.assertEqual(state["mode"], "voice")
 
+    def test_mix_transmission_blends_secondary_signal(self):
+        primary = build_transmission(seed="alpha station", mix_amount=0.0)
+        mixed = build_transmission(seed="alpha station", mix_seed="beta station", mix_amount=0.5)
+        self.assertIn("mix", mixed)
+        self.assertEqual(mixed["mix"]["seed"], "beta station")
+        self.assertGreater(len(mixed["packets"]), len(primary["packets"]) // 2)
+        self.assertIn("vu", mixed)
+
+    def test_sstv_mode_has_unique_decode(self):
+        state = build_transmission(seed="slowscan", mode="sstv")
+        self.assertTrue(state["signal"]["decoded"].startswith("SSTV frame:"))
+
     def test_server_handler_is_available(self):
         self.assertEqual(SignalLabHandler.__module__, "murmurarium.server")
 
