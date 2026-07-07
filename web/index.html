@@ -82,6 +82,18 @@
           <button id="export-wav" type="button">WAV</button>
         </div>
 
+        <section class="relay-panel" aria-label="Relay code">
+          <div class="section-title">
+            <h3>Relay Code</h3>
+            <button id="relay-copy" type="button">Copy</button>
+          </div>
+          <code id="relay-code" class="relay-code">tuning...</code>
+          <form id="relay-import" class="relay-import">
+            <input id="relay-paste" type="text" placeholder="Paste relay code to restore station" autocomplete="off">
+            <button type="submit">Import</button>
+          </form>
+        </section>
+
         <section class="dna-panel" aria-label="Station DNA">
           <div class="section-title">
             <h3>Station DNA</h3>
@@ -90,6 +102,11 @@
           <code id="dna-hash" class="dna-hash">tuning...</code>
           <div id="dna-bars" class="dna-bars"></div>
           <p id="dna-hybrid" class="dna-hybrid"></p>
+          <form id="dna-compare-form" class="dna-compare-form">
+            <input id="dna-compare-input" type="text" placeholder="Compare another DNA hash" autocomplete="off">
+            <button type="submit">Match</button>
+          </form>
+          <p id="dna-compare-result" class="dna-compare-result"></p>
         </section>
 
         <section class="dream-panel" aria-label="Dream transmission">
@@ -98,6 +115,8 @@
             <span id="dream-mood">idle</span>
           </div>
           <p id="dream-text" class="dream-text">Tune a station to receive a dream transmission.</p>
+          <button id="dream-save" type="button">Save dream</button>
+          <ol id="dream-journal" class="dream-journal"></ol>
         </section>
 
         <section class="leaderboard-panel" aria-label="Challenge leaderboard">

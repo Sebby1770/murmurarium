@@ -10,7 +10,7 @@ from pathlib import Path
 import time
 from urllib.parse import parse_qs, urlparse
 
-from .simulation import build_transmission, list_presets
+from .simulation import build_transmission, compare_dna, decode_relay, encode_relay, list_presets
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -38,10 +38,39 @@ class SignalLabHandler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/stream":
             self._handle_stream(parsed.query)
             return
+        if parsed.path == "/api/relay":
+            self._handle_relay_encode(parsed.query)
+            return
         if parsed.path == "/health":
-            self._send_json({"ok": True, "name": "spectral-switchboard", "version": "0.6.0"})
+            self._send_json({"ok": True, "name": "spectral-switchboard", "version": "0.7.0"})
             return
         super().do_GET()
+
+    def do_POST(self) -> None:
+        parsed = urlparse(self.path)
+        if parsed.path == "/api/relay/decode":
+            length = int(self.headers.get("Content-Length", "0"))
+            body = self.rfile.read(length) if length else b"{}"
+            try:
+                payload = json.loads(body.decode("utf-8"))
+                station = decode_relay(str(payload.get("code", "")))
+            except (json.JSONDecodeError, ValueError) as exc:
+                self._send_json({"error": str(exc)}, status=HTTPStatus.BAD_REQUEST)
+                return
+            self._send_json({"station": station})
+            return
+        if parsed.path == "/api/dna/compare":
+            length = int(self.headers.get("Content-Length", "0"))
+            body = self.rfile.read(length) if length else b"{}"
+            try:
+                payload = json.loads(body.decode("utf-8"))
+                result = compare_dna(str(payload.get("left", "")), str(payload.get("right", "")))
+            except json.JSONDecodeError as exc:
+                self._send_json({"error": str(exc)}, status=HTTPStatus.BAD_REQUEST)
+                return
+            self._send_json(result)
+            return
+        self.send_error(HTTPStatus.NOT_FOUND)
 
     def _handle_transmission(self, query: str) -> None:
         params = parse_qs(query)
@@ -106,9 +135,22 @@ class SignalLabHandler(SimpleHTTPRequestHandler):
         except (BrokenPipeError, ConnectionResetError):
             return
 
-    def _send_json(self, payload: dict[str, object]) -> None:
+    def _handle_relay_encode(self, query: str) -> None:
+        params = parse_qs(query)
+        code = encode_relay(
+            seed=params.get("seed", ["numbers station for houseplants"])[0],
+            frequency=_parse_float(params.get("frequency", ["7.13"])[0], default=7.13),
+            noise=_parse_float(params.get("noise", ["0.32"])[0], default=0.32),
+            packets=_parse_int(params.get("packets", ["18"])[0], default=18),
+            mode=params.get("mode", ["voice"])[0],
+            mix_seed=params.get("mix_seed", [""])[0],
+            mix_amount=_parse_float(params.get("mix_amount", ["0"])[0], default=0.0),
+        )
+        self._send_json({"code": code})
+
+    def _send_json(self, payload: dict[str, object], *, status: HTTPStatus = HTTPStatus.OK) -> None:
         body = json.dumps(payload, indent=2).encode("utf-8")
-        self.send_response(HTTPStatus.OK)
+        self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Cache-Control", "no-store")
         self.send_header("Access-Control-Allow-Origin", "*")

@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.7.0 — 2026-07-07
+
+### Added
+- **Relay codes** — compact base64 station payloads via `/api/relay` encode and `/api/relay/decode`
+- **Dream journal** — save dreams to localStorage with callsign, mood, and coherence
+- **DNA compare** — paste another hash to score overlap via `/api/dna/compare`
+- Animated **Lissajous** scope drift tied to live time
+
+### Improved
+- Relay import restores full station state including mix parameters
+
 ## 0.6.0 — 2026-07-07
 
 ### Added

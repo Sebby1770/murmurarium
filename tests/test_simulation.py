@@ -2,7 +2,15 @@ import json
 import unittest
 
 from murmurarium.server import SignalLabHandler
-from murmurarium.simulation import build_transmission, event_seed, list_presets, seed_to_int
+from murmurarium.simulation import (
+    build_transmission,
+    compare_dna,
+    decode_relay,
+    encode_relay,
+    event_seed,
+    list_presets,
+    seed_to_int,
+)
 
 
 class SimulationTests(unittest.TestCase):
@@ -68,6 +76,23 @@ class SimulationTests(unittest.TestCase):
         self.assertIn("secretWord", state["challenge"])
         self.assertIn("stars", state["constellation"])
         self.assertIn("edges", state["constellation"])
+
+    def test_relay_round_trip_and_dna_compare(self):
+        code = encode_relay(
+            seed="relay test",
+            frequency=8.2,
+            noise=0.4,
+            packets=20,
+            mode="morse",
+            mix_seed="ghost",
+            mix_amount=0.25,
+        )
+        station = decode_relay(code)
+        self.assertEqual(station["seed"], "relay test")
+        self.assertEqual(station["mode"], "morse")
+        match = compare_dna("abcd1234", "abcd9999")
+        self.assertGreaterEqual(match["overlap"], 4)
+        self.assertGreater(match["score"], 0.4)
 
     def test_dna_dream_and_lissajous_included(self):
         state = build_transmission(seed="dream dna test")

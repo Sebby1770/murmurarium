@@ -136,7 +136,8 @@ input {
 .band-panel,
 .gallery-panel,
 .dna-panel,
-.dream-panel {
+.dream-panel,
+.relay-panel {
   display: grid;
   gap: 0.55rem;
   padding-top: 0.75rem;
@@ -258,11 +259,68 @@ input {
 }
 
 .dna-hybrid,
-.dream-text {
+.dream-text,
+.dna-compare-result {
   margin: 0;
   color: var(--muted);
   font-size: 0.82rem;
   line-height: 1.5;
+}
+
+.relay-panel,
+.relay-code {
+  display: block;
+}
+
+.relay-code {
+  padding: 0.45rem 0.55rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: rgba(5, 7, 12, 0.55);
+  color: var(--amber);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.72rem;
+  word-break: break-all;
+}
+
+.relay-import,
+.dna-compare-form {
+  display: grid;
+  gap: 0.45rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.dream-journal {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dream-journal li {
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: rgba(248, 243, 214, 0.04);
+}
+
+.dream-journal strong {
+  color: var(--paper);
+}
+
+.dream-journal span {
+  color: var(--trace);
+  font-size: 0.74rem;
+}
+
+.dream-journal em {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-style: normal;
+  line-height: 1.45;
 }
 
 .challenge-hint {

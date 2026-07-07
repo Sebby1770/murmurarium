@@ -69,6 +69,16 @@ const dnaResonance = document.querySelector("#dna-resonance");
 const dnaHybrid = document.querySelector("#dna-hybrid");
 const dreamText = document.querySelector("#dream-text");
 const dreamMood = document.querySelector("#dream-mood");
+const dreamSaveButton = document.querySelector("#dream-save");
+const dreamJournal = document.querySelector("#dream-journal");
+const relayCode = document.querySelector("#relay-code");
+const relayCopyButton = document.querySelector("#relay-copy");
+const relayImportForm = document.querySelector("#relay-import");
+const relayPasteInput = document.querySelector("#relay-paste");
+const dnaCompareForm = document.querySelector("#dna-compare-form");
+const dnaCompareInput = document.querySelector("#dna-compare-input");
+const dnaCompareResult = document.querySelector("#dna-compare-result");
+const DREAM_JOURNAL_KEY = "spectral-switchboard-dream-journal";
 
 const stations = [
   "numbers station for houseplants",
@@ -196,6 +206,7 @@ async function loadState(force = false) {
     updateChallenge();
     updateDna();
     updateDream();
+    updateRelayCode();
     updateBandPlan();
     updateSignalTelemetry();
     pushWaterfallRow();
@@ -321,6 +332,102 @@ function updateDream() {
   dreamText.textContent = state.dream.text;
 }
 
+function loadDreamJournal() {
+  try {
+    return JSON.parse(localStorage.getItem(DREAM_JOURNAL_KEY) || "[]");
+  } catch {
+    return [];
+  }
+}
+
+function renderDreamJournal() {
+  const entries = loadDreamJournal();
+  dreamJournal.innerHTML = entries
+    .map(
+      (entry) => `
+        <li>
+          <strong>${entry.callsign}</strong>
+          <span>${entry.mood} · ${entry.coherence}%</span>
+          <em>${entry.text}</em>
+        </li>
+      `
+    )
+    .join("");
+}
+
+function saveDreamEntry() {
+  if (!state?.dream) return;
+  const entries = loadDreamJournal();
+  const entry = {
+    callsign: state.signal.callsign,
+    mood: state.dream.mood,
+    text: state.dream.text,
+    coherence: Math.round((state.dream.coherence ?? state.analysis.coherence) * 100),
+    savedAt: Date.now(),
+  };
+  const duplicate = entries.some((item) => item.text === entry.text && item.callsign === entry.callsign);
+  if (!duplicate) {
+    entries.unshift(entry);
+    localStorage.setItem(DREAM_JOURNAL_KEY, JSON.stringify(entries.slice(0, 10)));
+    renderDreamJournal();
+    hoverText.textContent = "Dream saved to journal.";
+  }
+}
+
+async function updateRelayCode() {
+  const params = new URLSearchParams({
+    seed: seedInput.value,
+    frequency: frequencyInput.value,
+    noise: noiseInput.value,
+    packets: packetsInput.value,
+    mode: modeInput.value,
+    mix_seed: mixSeedInput.value,
+    mix_amount: mixAmountInput.value,
+  });
+  try {
+    const response = await fetch(`/api/relay?${params.toString()}`);
+    const payload = await response.json();
+    relayCode.textContent = payload.code || "—";
+  } catch {
+    relayCode.textContent = "relay offline";
+  }
+}
+
+async function importRelayCode(code) {
+  const response = await fetch("/api/relay/decode", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ code }),
+  });
+  if (!response.ok) {
+    hoverText.textContent = "Invalid relay code.";
+    return;
+  }
+  const payload = await response.json();
+  const station = payload.station;
+  seedInput.value = station.seed;
+  frequencyInput.value = String(station.frequency);
+  noiseInput.value = String(station.noise);
+  packetsInput.value = String(station.packets);
+  modeInput.value = station.mode;
+  mixSeedInput.value = station.mix_seed || "";
+  mixAmountInput.value = String(station.mix_amount ?? 0);
+  start = performance.now();
+  loadState(true);
+  hoverText.textContent = "Station restored from relay code.";
+}
+
+async function compareDnaHashes(rightHash) {
+  if (!state?.dna?.hash || !rightHash.trim()) return;
+  const response = await fetch("/api/dna/compare", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ left: state.dna.hash, right: rightHash.trim() }),
+  });
+  const payload = await response.json();
+  dnaCompareResult.textContent = `Match ${Math.round(payload.score * 100)}% · ${payload.overlap} chars overlap`;
+}
+
 function recordTapeFrame() {
   if (!tapeRecordButton || tapeRecordButton.getAttribute("aria-pressed") !== "true" || !state) return;
   tapeFrames.push({
@@ -424,9 +531,10 @@ function drawLissajous(width, height) {
   ctx.strokeStyle = alpha(cssVar("--cool"), 0.35);
   ctx.strokeRect(cx - size / 2 - 8, cy - size / 2 - 8, size + 16, size + 16);
   ctx.beginPath();
+  const drift = Math.sin(performance.now() / 1400) * 0.04;
   state.lissajous.forEach((point, index) => {
-    const x = cx + (point.x - 0.5) * size;
-    const y = cy + (point.y - 0.5) * size;
+    const x = cx + (point.x - 0.5 + drift) * size;
+    const y = cy + (point.y - 0.5 - drift) * size;
     if (index === 0) ctx.moveTo(x, y);
     else ctx.lineTo(x, y);
   });
@@ -854,6 +962,7 @@ function toggleLiveStream() {
         updateChallenge();
         updateDna();
         updateDream();
+        updateRelayCode();
         updateBandPlan();
         updateSignalTelemetry();
         pushWaterfallRow();
@@ -1110,6 +1219,23 @@ freezeButton.addEventListener("click", toggleFreeze);
 captureButton.addEventListener("click", capture);
 exportButton.addEventListener("click", exportJson);
 exportWavButton.addEventListener("click", exportWav);
+dreamSaveButton.addEventListener("click", saveDreamEntry);
+relayCopyButton.addEventListener("click", async () => {
+  try {
+    await navigator.clipboard.writeText(relayCode.textContent);
+    hoverText.textContent = "Relay code copied.";
+  } catch {
+    hoverText.textContent = relayCode.textContent;
+  }
+});
+relayImportForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  importRelayCode(relayPasteInput.value);
+});
+dnaCompareForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  compareDnaHashes(dnaCompareInput.value);
+});
 soundButton.addEventListener("click", toggleSound);
 presetButtons.forEach((button) => button.addEventListener("click", usePreset));
 window.addEventListener("resize", resizeCanvas);
@@ -1147,5 +1273,6 @@ resizeCanvas();
 loadUrlState();
 renderGallery();
 renderLeaderboard();
+renderDreamJournal();
 loadState(true);
 draw();

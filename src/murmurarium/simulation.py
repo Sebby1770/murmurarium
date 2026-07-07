@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from base64 import urlsafe_b64decode, urlsafe_b64encode
 from dataclasses import asdict, dataclass
 from datetime import date
 import hashlib
+import json
 import math
 import random
 from typing import Any
@@ -123,6 +125,58 @@ def seed_to_int(seed: str) -> int:
     normalized = (seed or "spectral switchboard").strip().lower().encode("utf-8")
     digest = hashlib.sha256(normalized).hexdigest()
     return int(digest[:16], 16)
+
+
+def encode_relay(
+    *,
+    seed: str,
+    frequency: float,
+    noise: float,
+    packets: int,
+    mode: str,
+    mix_seed: str = "",
+    mix_amount: float = 0.0,
+) -> str:
+    payload = json.dumps(
+        {
+            "seed": seed,
+            "frequency": round(float(frequency), 3),
+            "noise": round(float(noise), 3),
+            "packets": int(packets),
+            "mode": _normalize_mode(mode),
+            "mix_seed": mix_seed,
+            "mix_amount": round(float(mix_amount), 3),
+        },
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return urlsafe_b64encode(payload).decode("ascii").rstrip("=")
+
+
+def decode_relay(code: str) -> dict[str, str | float | int]:
+    padded = code.strip() + "=" * (-len(code.strip()) % 4)
+    payload = json.loads(urlsafe_b64decode(padded.encode("ascii")).decode("utf-8"))
+    return {
+        "seed": str(payload.get("seed", "numbers station for houseplants")),
+        "frequency": float(payload.get("frequency", 7.13)),
+        "noise": float(payload.get("noise", 0.32)),
+        "packets": int(payload.get("packets", 18)),
+        "mode": _normalize_mode(str(payload.get("mode", "voice"))),
+        "mix_seed": str(payload.get("mix_seed", "")),
+        "mix_amount": float(payload.get("mix_amount", 0.0)),
+    }
+
+
+def compare_dna(left_hash: str, right_hash: str) -> dict[str, int | float | str]:
+    left = (left_hash or "").strip().lower()
+    right = (right_hash or "").strip().lower()
+    overlap = sum(1 for a, b in zip(left, right) if a == b)
+    length = max(len(left), len(right), 1)
+    return {
+        "left": left,
+        "right": right,
+        "overlap": overlap,
+        "score": _round(overlap / length),
+    }
 
 
 def build_transmission(
