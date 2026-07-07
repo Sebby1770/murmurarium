@@ -2,6 +2,8 @@ const canvas = document.querySelector("#signal-canvas");
 const ctx = canvas.getContext("2d");
 const phosphorCanvas = document.querySelector("#phosphor-canvas");
 const phosphorCtx = phosphorCanvas.getContext("2d");
+const waterfallCanvas = document.querySelector("#waterfall-canvas");
+const waterfallCtx = waterfallCanvas.getContext("2d");
 const seedInput = document.querySelector("#seed");
 const frequencyInput = document.querySelector("#frequency");
 const noiseInput = document.querySelector("#noise");
@@ -52,6 +54,14 @@ const challengeHint = document.querySelector("#challenge-hint");
 const challengeStatus = document.querySelector("#challenge-status");
 const challengeForm = document.querySelector("#challenge-form");
 const challengeGuess = document.querySelector("#challenge-guess");
+const liveStreamButton = document.querySelector("#live-stream");
+const galleryExportButton = document.querySelector("#gallery-export");
+const signalGradeLabel = document.querySelector("#signal-grade");
+const interferenceLabel = document.querySelector("#interference-level");
+const bandPlanList = document.querySelector("#band-plan");
+const leaderboardList = document.querySelector("#leaderboard-list");
+const leaderboardCount = document.querySelector("#leaderboard-count");
+const LEADERBOARD_KEY = "spectral-switchboard-leaderboard";
 
 const stations = [
   "numbers station for houseplants",
@@ -75,6 +85,8 @@ let eventSource = null;
 let tapeFrames = [];
 let tapePlaying = false;
 let challengeSolved = false;
+let waterfallHistory = [];
+let liveStreamActive = false;
 
 function resizeCanvas() {
   const rect = canvas.getBoundingClientRect();
@@ -85,8 +97,11 @@ function resizeCanvas() {
   canvas.height = height;
   phosphorCanvas.width = width;
   phosphorCanvas.height = height;
+  waterfallCanvas.width = width;
+  waterfallCanvas.height = height;
   ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
   phosphorCtx.setTransform(ratio, 0, 0, ratio, 0, 0);
+  waterfallCtx.setTransform(ratio, 0, 0, ratio, 0, 0);
 }
 
 function renderPhosphor(width, height) {
@@ -99,6 +114,20 @@ function renderPhosphor(width, height) {
   ctx.globalAlpha = 0.42;
   ctx.drawImage(phosphorCanvas, 0, 0, width, height);
   ctx.globalAlpha = 1;
+}
+
+function streamUrl() {
+  const params = new URLSearchParams({
+    seed: seedInput.value,
+    frequency: frequencyInput.value,
+    noise: noiseInput.value,
+    packets: packetsInput.value,
+    mode: modeInput.value,
+    mix_seed: mixSeedInput.value,
+    mix_amount: mixAmountInput.value,
+    interval: "0.55",
+  });
+  return `/api/stream?${params.toString()}`;
 }
 
 function apiUrl(now) {
@@ -158,6 +187,9 @@ async function loadState(force = false) {
     updateScanLog();
     updateTimeline();
     updateChallenge();
+    updateBandPlan();
+    updateSignalTelemetry();
+    pushWaterfallRow();
     updateAudio();
     recordTapeFrame();
     syncUrlState();
@@ -197,6 +229,59 @@ function updateLabels() {
   if (state.vu != null) {
     vuFill.style.height = `${Math.round(state.vu * 100)}%`;
   }
+}
+
+function updateSignalTelemetry() {
+  if (!state?.analysis) return;
+  const grade = state.analysis.signalGrade || "—";
+  signalGradeLabel.textContent = grade;
+  signalGradeLabel.dataset.grade = grade;
+  const interference = state.analysis.interference ?? 0;
+  interferenceLabel.textContent = `${Math.round(interference * 100)}%`;
+}
+
+function updateBandPlan() {
+  if (!state?.analysis?.bandPlan) return;
+  bandPlanList.innerHTML = state.analysis.bandPlan
+    .map(
+      (band) => `
+        <li>
+          <span>${Number(band.hz).toFixed(0)} Hz</span>
+          <div class="band-bar"><span style="--amp:${band.amp}"></span></div>
+          <b>${Math.round(band.amp * 100)}%</b>
+        </li>
+      `
+    )
+    .join("");
+}
+
+function pushWaterfallRow() {
+  if (!state?.spectrum) return;
+  waterfallHistory.push(state.spectrum.map((bin) => bin.amp));
+  waterfallHistory = waterfallHistory.slice(-120);
+  renderWaterfall();
+}
+
+function renderWaterfall() {
+  const width = waterfallCanvas.clientWidth;
+  const height = waterfallCanvas.clientHeight;
+  if (!width || !height || !waterfallHistory.length) return;
+  waterfallCtx.clearRect(0, 0, width, height);
+  const rowHeight = Math.max(1, height / waterfallHistory.length);
+  const binCount = waterfallHistory[0].length;
+  const binWidth = width / binCount;
+  waterfallHistory.forEach((row, rowIndex) => {
+    row.forEach((amp, binIndex) => {
+      const hue = amp > 0.66 ? cssVar("--hot") : amp > 0.33 ? cssVar("--amber") : cssVar("--trace");
+      waterfallCtx.fillStyle = alpha(hue, 0.12 + amp * 0.72);
+      waterfallCtx.fillRect(
+        binIndex * binWidth,
+        rowIndex * rowHeight,
+        Math.max(1, binWidth),
+        Math.max(1, rowHeight)
+      );
+    });
+  });
 }
 
 function updateChallenge() {
@@ -629,6 +714,111 @@ function renderGallery() {
   });
 }
 
+function loadLeaderboard() {
+  try {
+    return JSON.parse(localStorage.getItem(LEADERBOARD_KEY) || "[]");
+  } catch {
+    return [];
+  }
+}
+
+function renderLeaderboard() {
+  const entries = loadLeaderboard();
+  leaderboardCount.textContent = `${entries.length} solves`;
+  leaderboardList.innerHTML = entries
+    .map(
+      (entry, index) => `
+        <li>
+          <span class="leaderboard-rank">${index + 1}</span>
+          <span>
+            <strong>${entry.callsign}</strong>
+            <em>${entry.word} · ${entry.grade}</em>
+          </span>
+          <b>${entry.coherence}%</b>
+        </li>
+      `
+    )
+    .join("");
+}
+
+function recordLeaderboardSolve() {
+  if (!state?.challenge || !challengeSolved) return;
+  const entries = loadLeaderboard();
+  const entry = {
+    callsign: state.signal.callsign,
+    word: state.challenge.secretWord,
+    grade: state.analysis.signalGrade || "—",
+    coherence: Math.round(state.analysis.coherence * 100),
+    solvedAt: Date.now(),
+  };
+  const duplicate = entries.some(
+    (item) => item.word === entry.word && item.callsign === entry.callsign
+  );
+  if (!duplicate) {
+    entries.unshift(entry);
+    localStorage.setItem(LEADERBOARD_KEY, JSON.stringify(entries.slice(0, 8)));
+    renderLeaderboard();
+  }
+}
+
+function exportGallery() {
+  const items = loadGallery();
+  if (!items.length) {
+    hoverText.textContent = "Gallery is empty — save a station first.";
+    return;
+  }
+  const blob = new Blob([JSON.stringify(items, null, 2)], { type: "application/json" });
+  const link = document.createElement("a");
+  link.download = `spectral-gallery-${Date.now()}.json`;
+  link.href = URL.createObjectURL(blob);
+  link.click();
+  URL.revokeObjectURL(link.href);
+  hoverText.textContent = `Exported ${items.length} saved station(s).`;
+}
+
+function toggleLiveStream() {
+  const enabled = liveStreamButton.getAttribute("aria-pressed") !== "true";
+  liveStreamButton.setAttribute("aria-pressed", String(enabled));
+  liveStreamActive = enabled;
+  if (eventSource) {
+    eventSource.close();
+    eventSource = null;
+  }
+  if (enabled) {
+    isFrozen = false;
+    freezeButton.setAttribute("aria-pressed", "false");
+    freezeButton.textContent = "Freeze";
+    eventSource = new EventSource(streamUrl());
+    eventSource.onmessage = (event) => {
+      try {
+        state = JSON.parse(event.data);
+        applyPalette();
+        updateLabels();
+        updatePacketList();
+        updateScanLog();
+        updateTimeline();
+        updateChallenge();
+        updateBandPlan();
+        updateSignalTelemetry();
+        pushWaterfallRow();
+        updateAudio();
+        recordTapeFrame();
+      } catch {
+        hoverText.textContent = "Live stream frame could not be decoded.";
+      }
+    };
+    eventSource.onerror = () => {
+      hoverText.textContent = "Live stream disconnected.";
+      toggleLiveStream();
+    };
+    hoverText.textContent = "Live SSE stream connected.";
+  } else {
+    hoverText.textContent = "Live stream stopped.";
+    start = performance.now();
+    loadState(true);
+  }
+}
+
 function saveToGallery() {
   if (!state) return;
   const items = loadGallery();
@@ -803,6 +993,7 @@ challengeForm.addEventListener("submit", (event) => {
   if (guess === state.challenge.secretWord) {
     challengeSolved = true;
     challengeStatus.textContent = "solved";
+    recordLeaderboardSolve();
     hoverText.textContent = `Challenge cleared: the hidden word was "${state.challenge.secretWord}".`;
   } else {
     challengeStatus.textContent = "miss";
@@ -812,6 +1003,8 @@ challengeForm.addEventListener("submit", (event) => {
 shareButton.addEventListener("click", shareStation);
 fullscreenButton.addEventListener("click", toggleFullscreen);
 gallerySaveButton.addEventListener("click", saveToGallery);
+galleryExportButton.addEventListener("click", exportGallery);
+liveStreamButton.addEventListener("click", toggleLiveStream);
 freezeButton.addEventListener("click", toggleFreeze);
 captureButton.addEventListener("click", capture);
 exportButton.addEventListener("click", exportJson);
@@ -819,9 +1012,35 @@ soundButton.addEventListener("click", toggleSound);
 presetButtons.forEach((button) => button.addEventListener("click", usePreset));
 window.addEventListener("resize", resizeCanvas);
 
-setInterval(() => loadState(false), 560);
+window.addEventListener("keydown", (event) => {
+  if (event.target.matches("input, textarea, select")) return;
+  const key = event.key.toLowerCase();
+  if (key === "s") {
+    event.preventDefault();
+    scan();
+  } else if (key === "f") {
+    event.preventDefault();
+    toggleFreeze();
+  } else if (key === "l") {
+    event.preventDefault();
+    toggleLiveStream();
+  } else if (key === "a") {
+    event.preventDefault();
+    toggleAutoScan();
+  } else if (key === "c") {
+    event.preventDefault();
+    capture();
+  } else if (key === "?") {
+    hoverText.textContent = "Shortcuts: S scan · F freeze · L live · A auto · C capture";
+  }
+});
+
+setInterval(() => {
+  if (!liveStreamActive) loadState(false);
+}, 560);
 resizeCanvas();
 loadUrlState();
 renderGallery();
+renderLeaderboard();
 loadState(true);
 draw();

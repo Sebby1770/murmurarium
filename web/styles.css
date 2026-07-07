@@ -52,6 +52,7 @@ input {
 }
 
 #phosphor-canvas,
+#waterfall-canvas,
 #signal-canvas {
   position: absolute;
   inset: 0;
@@ -64,6 +65,12 @@ input {
 #phosphor-canvas {
   pointer-events: none;
   opacity: 0.55;
+}
+
+#waterfall-canvas {
+  pointer-events: none;
+  opacity: 0.38;
+  mix-blend-mode: screen;
 }
 
 #signal-canvas {
@@ -124,9 +131,102 @@ input {
 }
 
 .challenge-panel,
-.tape-panel {
+.tape-panel,
+.leaderboard-panel,
+.band-panel,
+.gallery-panel {
   display: grid;
   gap: 0.55rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--line);
+}
+
+.leaderboard-list,
+.band-plan {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.leaderboard-list li,
+.band-plan li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 0.55rem;
+  align-items: center;
+  min-height: 2.6rem;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: rgba(248, 243, 214, 0.04);
+}
+
+.leaderboard-rank {
+  display: inline-grid;
+  place-items: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 999px;
+  background: rgba(124, 255, 196, 0.12);
+  color: var(--trace);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.leaderboard-list strong,
+.band-plan span {
+  display: block;
+  color: var(--paper);
+}
+
+.leaderboard-list em {
+  display: block;
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-style: normal;
+}
+
+.leaderboard-list b,
+.band-plan b {
+  color: var(--amber);
+  font-size: 0.82rem;
+}
+
+.band-plan li {
+  grid-template-columns: 4.5rem minmax(0, 1fr) auto;
+}
+
+.band-bar {
+  height: 0.45rem;
+  border-radius: 999px;
+  background: rgba(248, 243, 214, 0.08);
+  overflow: hidden;
+}
+
+.band-bar span {
+  display: block;
+  height: 100%;
+  width: calc(var(--amp) * 100%);
+  background: linear-gradient(90deg, var(--trace), var(--amber));
+}
+
+#signal-grade[data-grade="A"] {
+  color: var(--trace);
+}
+
+#signal-grade[data-grade="B"] {
+  color: var(--amber);
+}
+
+#signal-grade[data-grade="C"] {
+  color: var(--cool);
+}
+
+#signal-grade[data-grade="D"] {
+  color: var(--hot);
 }
 
 .challenge-hint {

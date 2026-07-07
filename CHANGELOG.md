@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.5.0 — 2026-07-07
+
+### Added
+- **Waterfall spectrogram** canvas overlay scrolling spectrum history
+- **Live SSE toggle** button wiring the existing `/api/stream` endpoint
+- **Keyboard shortcuts**: S scan, F freeze, L live, A auto-scan, C capture, ? help
+- **Challenge leaderboard** persisted in localStorage with grade and coherence
+- **Gallery export** downloads saved stations as JSON
+- **Band plan** panel showing top five spectrum bins
+- **Signal grade** (A–D) and **interference** telemetry in analysis
+
+### Improved
+- Analysis payload now includes `signalGrade`, `interference`, and `bandPlan`
+- Waterfall rendering blends trace/amber/hot palette by amplitude
+
 ## 0.4.0 — 2026-07-07
 
 ### Added

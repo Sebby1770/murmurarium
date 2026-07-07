@@ -11,6 +11,7 @@
     <main class="app-shell">
       <section class="stage" aria-label="Signal console">
         <canvas id="phosphor-canvas" aria-hidden="true"></canvas>
+        <canvas id="waterfall-canvas" aria-hidden="true"></canvas>
         <canvas id="signal-canvas"></canvas>
         <div class="vu-meter" aria-hidden="true">
           <div id="vu-fill" class="vu-fill"></div>
@@ -76,7 +77,17 @@
           <button id="share" type="button">Share</button>
           <button id="fullscreen" type="button">Full</button>
           <button id="gallery-save" type="button">Save</button>
+          <button id="live-stream" type="button" aria-pressed="false">Live</button>
+          <button id="gallery-export" type="button">Export</button>
         </div>
+
+        <section class="leaderboard-panel" aria-label="Challenge leaderboard">
+          <div class="section-title">
+            <h3>Leaderboard</h3>
+            <span id="leaderboard-count">0 solves</span>
+          </div>
+          <ol id="leaderboard-list" class="leaderboard-list"></ol>
+        </section>
 
         <section class="challenge-panel" aria-label="Decode challenge">
           <div class="section-title">
@@ -145,6 +156,21 @@
             <span>Strongest</span>
             <strong id="strongest-packet">...</strong>
           </div>
+          <div>
+            <span>Grade</span>
+            <strong id="signal-grade">...</strong>
+          </div>
+          <div>
+            <span>Interference</span>
+            <strong id="interference-level">...</strong>
+          </div>
+        </section>
+
+        <section class="band-panel" aria-label="Band plan">
+          <div class="section-title">
+            <h3>Band Plan</h3>
+          </div>
+          <ul id="band-plan" class="band-plan"></ul>
         </section>
 
         <section class="packet-panel" aria-label="Strong packet list">

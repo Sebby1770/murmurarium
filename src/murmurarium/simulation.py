@@ -385,6 +385,12 @@ def _build_analysis(
     link_density = len(links) / max(1, len(packets))
     coherence = _clamp(stability * 0.72 + average_strength * 0.2 + min(link_density, 1.0) * 0.08, 0.0, 1.0)
 
+    interference = _clamp(1.0 - coherence + average_drift * 0.35, 0.0, 1.0)
+    band_plan = [
+        {"hz": bin_item["hz"], "amp": bin_item["amp"]}
+        for bin_item in sorted(spectrum, key=lambda item: item["amp"], reverse=True)[:5]
+    ]
+
     return {
         "strongestPacket": {
             "id": strongest_packet.id,
@@ -399,7 +405,21 @@ def _build_analysis(
         "linkCount": len(links),
         "linkDensity": _round(link_density),
         "coherence": _round(coherence),
+        "interference": _round(interference),
+        "bandPlan": band_plan,
+        "signalGrade": _signal_grade(coherence, interference),
     }
+
+
+def _signal_grade(coherence: float, interference: float) -> str:
+    score = coherence * 0.7 + (1.0 - interference) * 0.3
+    if score >= 0.82:
+        return "A"
+    if score >= 0.68:
+        return "B"
+    if score >= 0.5:
+        return "C"
+    return "D"
 
 
 def _callsign(rng: random.Random, seed_int: int) -> str:

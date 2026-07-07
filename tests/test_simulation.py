@@ -69,6 +69,20 @@ class SimulationTests(unittest.TestCase):
         self.assertIn("stars", state["constellation"])
         self.assertIn("edges", state["constellation"])
 
+    def test_analysis_includes_grade_band_plan_and_interference(self):
+        state = build_transmission(seed="grade test", packets=20, noise=0.2)
+        analysis = state["analysis"]
+        self.assertIn("signalGrade", analysis)
+        self.assertIn(analysis["signalGrade"], ("A", "B", "C", "D"))
+        self.assertIn("interference", analysis)
+        self.assertGreaterEqual(analysis["interference"], 0.0)
+        self.assertLessEqual(analysis["interference"], 1.0)
+        self.assertIn("bandPlan", analysis)
+        self.assertEqual(len(analysis["bandPlan"]), 5)
+        for band in analysis["bandPlan"]:
+            self.assertIn("hz", band)
+            self.assertIn("amp", band)
+
     def test_event_seed_and_presets(self):
         self.assertTrue(event_seed())
         presets = list_presets()

@@ -39,7 +39,7 @@ class SignalLabHandler(SimpleHTTPRequestHandler):
             self._handle_stream(parsed.query)
             return
         if parsed.path == "/health":
-            self._send_json({"ok": True, "name": "spectral-switchboard", "version": "0.4.0"})
+            self._send_json({"ok": True, "name": "spectral-switchboard", "version": "0.5.0"})
             return
         super().do_GET()
 
