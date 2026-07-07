@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.4.0 — 2026-07-07
+
+### Added
+- **Decode challenge** mode with hidden word guessing per station
+- **Constellation map** mini-graph of packet stars and link edges
+- **Daily event seed** preset via `/api/presets` and Event button
+- **Auto-scan** mode cycling random stations every 4.2s
+- **Tape recorder** capturing coherence frames with playback
+
+### Improved
+- Presets API for programmatic station loading
+- Challenge hint panel and solve status in UI
+
 ## 0.3.0 — 2026-07-07
 
 ### Added

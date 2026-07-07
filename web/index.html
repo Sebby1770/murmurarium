@@ -66,14 +66,29 @@
 
         <div class="control-row">
           <button id="scan" type="button">Scan</button>
+          <button id="auto-scan" type="button" aria-pressed="false">Auto</button>
+          <button id="event-seed" type="button">Event</button>
           <button id="freeze" type="button" aria-pressed="false">Freeze</button>
           <button id="sound" type="button" aria-pressed="false">Audio</button>
+          <button id="tape-record" type="button" aria-pressed="false">Tape</button>
           <button id="capture" type="button">Capture</button>
           <button id="export-json" type="button">JSON</button>
           <button id="share" type="button">Share</button>
           <button id="fullscreen" type="button">Full</button>
           <button id="gallery-save" type="button">Save</button>
         </div>
+
+        <section class="challenge-panel" aria-label="Decode challenge">
+          <div class="section-title">
+            <h3>Challenge</h3>
+            <span id="challenge-status">listening</span>
+          </div>
+          <p id="challenge-hint" class="challenge-hint">Tune a station to reveal the hidden word.</p>
+          <form id="challenge-form" class="challenge-form">
+            <input id="challenge-guess" type="text" placeholder="Guess the hidden word" autocomplete="off">
+            <button type="submit">Check</button>
+          </form>
+        </section>
 
         <section class="gallery-panel" aria-label="Station gallery">
           <div class="section-title">
@@ -138,6 +153,17 @@
             <span id="packet-count">0 bursts</span>
           </div>
           <ol id="packet-list" class="packet-list"></ol>
+        </section>
+
+        <section class="tape-panel" aria-label="Tape recorder">
+          <div class="section-title">
+            <h3>Tape Recorder</h3>
+            <span id="tape-count">0 frames</span>
+          </div>
+          <div class="tape-actions">
+            <button id="tape-play" type="button" disabled>Play tape</button>
+            <button id="tape-clear" type="button" disabled>Clear</button>
+          </div>
         </section>
 
         <section class="timeline-panel" aria-label="Signal timeline">

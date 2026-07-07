@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+from datetime import date
 import hashlib
 import math
 import random
@@ -35,6 +36,13 @@ TRANSMISSION_MODES = ("voice", "numbers", "morse", "hex", "sstv")
 MORSE_FRAGMENTS = ("... ---", ".-.. .. -- -. /", "-. --- .-. - ....", "... - .- - .. --- -.")
 NUMBER_GROUPS = ("17", "42", "88", "103", "204", "319", "507", "614", "821", "903")
 HEX_FRAGMENTS = ("a4f2", "0d9c", "7b1e", "c0ff", "feed", "b33f", "dead", "cafe")
+CHALLENGE_WORDS = ("orchard", "basement", "pager", "eclipse", "carrier", "thunder", "antenna")
+EVENT_SEEDS = (
+    "solstice numbers relay",
+    "equinox static choir",
+    "aurora pager cadence",
+    "meteor shower morse",
+)
 
 
 @dataclass(frozen=True)
@@ -53,6 +61,60 @@ class Packet:
     phase: float
     tone: int
     width: float
+
+
+def event_seed(for_day: date | None = None) -> str:
+    """Return a deterministic rare station phrase for the given day."""
+
+    day = for_day or date.today()
+    digest = hashlib.sha256(day.isoformat().encode("utf-8")).hexdigest()
+    index = int(digest[:8], 16) % len(EVENT_SEEDS)
+    return EVENT_SEEDS[index]
+
+
+def list_presets() -> list[dict[str, str | float | int]]:
+    return [
+        {
+            "name": "Garden",
+            "seed": "numbers station for houseplants",
+            "frequency": 7.13,
+            "noise": 0.32,
+            "packets": 18,
+            "mode": "voice",
+        },
+        {
+            "name": "Midnight",
+            "seed": "midnight kettle on channel nine",
+            "frequency": 11.41,
+            "noise": 0.18,
+            "packets": 24,
+            "mode": "morse",
+        },
+        {
+            "name": "Weather",
+            "seed": "secret weather from the laundromat",
+            "frequency": 4.72,
+            "noise": 0.61,
+            "packets": 30,
+            "mode": "numbers",
+        },
+        {
+            "name": "Cipher",
+            "seed": "lost pager under the pier",
+            "frequency": 14.2,
+            "noise": 0.44,
+            "packets": 22,
+            "mode": "hex",
+        },
+        {
+            "name": "Event",
+            "seed": event_seed(),
+            "frequency": 9.8,
+            "noise": 0.27,
+            "packets": 20,
+            "mode": "sstv",
+        },
+    ]
 
 
 def seed_to_int(seed: str) -> int:
@@ -128,6 +190,8 @@ def _build_transmission_core(
     spectrum = _build_spectrum(seed_int, frequency, noise, t)
     links = _build_links(packet_items)
     analysis = _build_analysis(packet_items, spectrum, links, stability)
+    challenge = _build_challenge(seed_int, packet_items)
+    constellation = _build_constellation(packet_items, links)
 
     vu_level = _round(_clamp(stability * 0.6 + average_from_waveform(waveform) * 0.4, 0.0, 1.0))
 
@@ -141,6 +205,8 @@ def _build_transmission_core(
         "waveform": waveform,
         "spectrum": spectrum,
         "analysis": analysis,
+        "challenge": challenge,
+        "constellation": constellation,
         "timeline": _build_timeline(seed_int, t, stability, mode),
         "vu": vu_level,
         "signal": {
@@ -370,6 +436,41 @@ def _packet_band(local: random.Random, mode: str) -> str:
         "sstv": ("slowscan drift", "phosphor wash", "image carrier", "frame bleed"),
     }
     return local.choice(bands.get(mode, ("low velvet", "green carrier", "knife weather", "paper orbit")))
+
+
+def _build_challenge(seed_int: int, packets: list[Packet]) -> dict[str, Any]:
+    rng = random.Random(seed_int ^ 0xCAF1)
+    secret = rng.choice(CHALLENGE_WORDS)
+    marker_index = seed_int % len(packets)
+    marker = packets[marker_index]
+    return {
+        "hint": f"One packet whispers a hidden word. Strongest glyph: {marker.glyph}.",
+        "secretWord": secret,
+        "markerPacket": marker.id,
+    }
+
+
+def _build_constellation(
+    packets: list[Packet],
+    links: list[dict[str, Any]],
+) -> list[dict[str, float | str]]:
+    by_id = {packet.id: packet for packet in packets}
+    stars: list[dict[str, float | str]] = []
+    for packet in packets[:12]:
+        stars.append(
+            {
+                "id": packet.id,
+                "x": packet.x,
+                "y": packet.y,
+                "strength": packet.strength,
+                "label": packet.label,
+            }
+        )
+    edges: list[dict[str, str | float]] = []
+    for link in links[:24]:
+        if link["from"] in by_id and link["to"] in by_id:
+            edges.append({"from": link["from"], "to": link["to"], "gain": link["gain"]})
+    return {"stars": stars, "edges": edges}
 
 
 def _build_timeline(seed_int: int, t: float, stability: float, mode: str) -> list[dict[str, float | str]]:

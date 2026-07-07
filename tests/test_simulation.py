@@ -2,7 +2,7 @@ import json
 import unittest
 
 from murmurarium.server import SignalLabHandler
-from murmurarium.simulation import build_transmission, seed_to_int
+from murmurarium.simulation import build_transmission, event_seed, list_presets, seed_to_int
 
 
 class SimulationTests(unittest.TestCase):
@@ -61,6 +61,19 @@ class SimulationTests(unittest.TestCase):
     def test_sstv_mode_has_unique_decode(self):
         state = build_transmission(seed="slowscan", mode="sstv")
         self.assertTrue(state["signal"]["decoded"].startswith("SSTV frame:"))
+
+    def test_challenge_and_constellation_included(self):
+        state = build_transmission(seed="challenge test")
+        self.assertIn("challenge", state)
+        self.assertIn("secretWord", state["challenge"])
+        self.assertIn("stars", state["constellation"])
+        self.assertIn("edges", state["constellation"])
+
+    def test_event_seed_and_presets(self):
+        self.assertTrue(event_seed())
+        presets = list_presets()
+        self.assertGreaterEqual(len(presets), 5)
+        self.assertEqual(presets[-1]["name"], "Event")
 
     def test_server_handler_is_available(self):
         self.assertEqual(SignalLabHandler.__module__, "murmurarium.server")

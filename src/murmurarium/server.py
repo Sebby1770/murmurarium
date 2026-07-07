@@ -10,7 +10,7 @@ from pathlib import Path
 import time
 from urllib.parse import parse_qs, urlparse
 
-from .simulation import build_transmission
+from .simulation import build_transmission, list_presets
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -32,11 +32,14 @@ class SignalLabHandler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/transmission":
             self._handle_transmission(parsed.query)
             return
+        if parsed.path == "/api/presets":
+            self._send_json({"presets": list_presets()})
+            return
         if parsed.path == "/api/stream":
             self._handle_stream(parsed.query)
             return
         if parsed.path == "/health":
-            self._send_json({"ok": True, "name": "spectral-switchboard", "version": "0.3.0"})
+            self._send_json({"ok": True, "name": "spectral-switchboard", "version": "0.4.0"})
             return
         super().do_GET()
 

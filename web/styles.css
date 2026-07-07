@@ -123,6 +123,39 @@ input {
   white-space: nowrap;
 }
 
+.challenge-panel,
+.tape-panel {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.challenge-hint {
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+  margin: 0;
+}
+
+.challenge-form {
+  display: grid;
+  gap: 0.45rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.challenge-form input {
+  min-height: 2.4rem;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: rgba(248, 243, 214, 0.04);
+  color: var(--paper);
+}
+
+.tape-actions {
+  display: flex;
+  gap: 0.45rem;
+}
+
 .readout {
   position: absolute;
   left: 2rem;

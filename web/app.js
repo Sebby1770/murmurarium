@@ -42,6 +42,16 @@ const gallerySaveButton = document.querySelector("#gallery-save");
 const galleryList = document.querySelector("#gallery-list");
 const galleryCount = document.querySelector("#gallery-count");
 const GALLERY_KEY = "spectral-switchboard-gallery";
+const autoScanButton = document.querySelector("#auto-scan");
+const eventSeedButton = document.querySelector("#event-seed");
+const tapeRecordButton = document.querySelector("#tape-record");
+const tapePlayButton = document.querySelector("#tape-play");
+const tapeClearButton = document.querySelector("#tape-clear");
+const tapeCount = document.querySelector("#tape-count");
+const challengeHint = document.querySelector("#challenge-hint");
+const challengeStatus = document.querySelector("#challenge-status");
+const challengeForm = document.querySelector("#challenge-form");
+const challengeGuess = document.querySelector("#challenge-guess");
 
 const stations = [
   "numbers station for houseplants",
@@ -60,6 +70,11 @@ let start = performance.now();
 let audio = null;
 let isFrozen = false;
 let scanHistory = [];
+let autoScanTimer = null;
+let eventSource = null;
+let tapeFrames = [];
+let tapePlaying = false;
+let challengeSolved = false;
 
 function resizeCanvas() {
   const rect = canvas.getBoundingClientRect();
@@ -142,7 +157,9 @@ async function loadState(force = false) {
     updatePacketList();
     updateScanLog();
     updateTimeline();
+    updateChallenge();
     updateAudio();
+    recordTapeFrame();
     syncUrlState();
   } catch (error) {
     hoverText.textContent = "Signal endpoint is quiet. Check the local server.";
@@ -180,6 +197,27 @@ function updateLabels() {
   if (state.vu != null) {
     vuFill.style.height = `${Math.round(state.vu * 100)}%`;
   }
+}
+
+function updateChallenge() {
+  if (!state?.challenge) return;
+  challengeHint.textContent = state.challenge.hint;
+  if (challengeSolved) {
+    challengeStatus.textContent = "solved";
+  }
+}
+
+function recordTapeFrame() {
+  if (!tapeRecordButton || tapeRecordButton.getAttribute("aria-pressed") !== "true" || !state) return;
+  tapeFrames.push({
+    coherence: state.analysis.coherence,
+    callsign: state.signal.callsign,
+    t: performance.now(),
+  });
+  tapeFrames = tapeFrames.slice(-40);
+  tapeCount.textContent = `${tapeFrames.length} frames`;
+  tapePlayButton.disabled = tapeFrames.length < 2;
+  tapeClearButton.disabled = tapeFrames.length === 0;
 }
 
 function updatePacketList() {
@@ -255,9 +293,39 @@ function draw() {
     drawSpectrum(width, height);
     drawRadar(width, height);
     if (state.mode === "sstv") drawSstv(width, height);
+    drawConstellation(width, height);
     renderPhosphor(width, height);
   }
   requestAnimationFrame(draw);
+}
+
+function drawConstellation(width, height) {
+  if (!state?.constellation) return;
+  const left = width * 0.04;
+  const top = height * 0.72;
+  const mapWidth = width * 0.28;
+  const mapHeight = height * 0.2;
+  ctx.fillStyle = "rgba(5, 7, 12, 0.55)";
+  ctx.fillRect(left, top, mapWidth, mapHeight);
+  ctx.strokeStyle = alpha(cssVar("--cool"), 0.35);
+  ctx.strokeRect(left, top, mapWidth, mapHeight);
+  const byId = new Map(state.constellation.stars.map((star) => [star.id, star]));
+  for (const edge of state.constellation.edges) {
+    const from = byId.get(edge.from);
+    const to = byId.get(edge.to);
+    if (!from || !to) continue;
+    ctx.strokeStyle = alpha(cssVar("--trace"), 0.08 + edge.gain * 0.35);
+    ctx.beginPath();
+    ctx.moveTo(left + from.x * mapWidth, top + from.y * mapHeight);
+    ctx.lineTo(left + to.x * mapWidth, top + to.y * mapHeight);
+    ctx.stroke();
+  }
+  for (const star of state.constellation.stars) {
+    ctx.fillStyle = alpha(cssVar("--amber"), 0.35 + star.strength * 0.5);
+    ctx.beginPath();
+    ctx.arc(left + star.x * mapWidth, top + star.y * mapHeight, 2 + star.strength * 3, 0, Math.PI * 2);
+    ctx.fill();
+  }
 }
 
 function drawSstv(width, height) {
@@ -439,8 +507,72 @@ function findHovered(width, height, cx, cy, radius) {
   return winner;
 }
 
+async function loadEventSeed() {
+  try {
+    const response = await fetch("/api/presets");
+    const payload = await response.json();
+    const event = payload.presets.find((preset) => preset.name === "Event");
+    if (!event) return;
+    seedInput.value = event.seed;
+    frequencyInput.value = String(event.frequency);
+    noiseInput.value = String(event.noise);
+    packetsInput.value = String(event.packets);
+    modeInput.value = event.mode;
+    challengeSolved = false;
+    challengeStatus.textContent = "listening";
+    start = performance.now();
+    loadState(true);
+  } catch {
+    hoverText.textContent = "Could not load today's event station.";
+  }
+}
+
+function toggleAutoScan() {
+  const enabled = autoScanButton.getAttribute("aria-pressed") !== "true";
+  autoScanButton.setAttribute("aria-pressed", String(enabled));
+  if (autoScanTimer) {
+    clearInterval(autoScanTimer);
+    autoScanTimer = null;
+  }
+  if (enabled) {
+    autoScanTimer = setInterval(scan, 4200);
+    scan();
+  }
+}
+
+function toggleTapeRecord() {
+  const enabled = tapeRecordButton.getAttribute("aria-pressed") !== "true";
+  tapeRecordButton.setAttribute("aria-pressed", String(enabled));
+  tapeRecordButton.textContent = enabled ? "Rec" : "Tape";
+}
+
+function playTape() {
+  if (tapeFrames.length < 2 || tapePlaying) return;
+  tapePlaying = true;
+  let index = 0;
+  const timer = setInterval(() => {
+    const frame = tapeFrames[index];
+    coherenceLabel.textContent = `${Math.round(frame.coherence * 100)}%`;
+    callsignLabel.textContent = frame.callsign;
+    index += 1;
+    if (index >= tapeFrames.length) {
+      clearInterval(timer);
+      tapePlaying = false;
+    }
+  }, 280);
+}
+
+function clearTape() {
+  tapeFrames = [];
+  tapeCount.textContent = "0 frames";
+  tapePlayButton.disabled = true;
+  tapeClearButton.disabled = true;
+}
+
 function scan() {
   seedInput.value = stations[Math.floor(Math.random() * stations.length)];
+  challengeSolved = false;
+  challengeStatus.textContent = "listening";
   frequencyInput.value = (2 + Math.random() * 16).toFixed(2);
   noiseInput.value = (Math.random() * 0.72).toFixed(2);
   packetsInput.value = String(12 + Math.floor(Math.random() * 24));
@@ -659,6 +791,24 @@ modeInput.addEventListener("change", () => loadState(true));
 mixSeedInput.addEventListener("input", () => loadState(true));
 mixAmountInput.addEventListener("input", () => loadState(true));
 scanButton.addEventListener("click", scan);
+autoScanButton.addEventListener("click", toggleAutoScan);
+eventSeedButton.addEventListener("click", loadEventSeed);
+tapeRecordButton.addEventListener("click", toggleTapeRecord);
+tapePlayButton.addEventListener("click", playTape);
+tapeClearButton.addEventListener("click", clearTape);
+challengeForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  if (!state?.challenge) return;
+  const guess = challengeGuess.value.trim().toLowerCase();
+  if (guess === state.challenge.secretWord) {
+    challengeSolved = true;
+    challengeStatus.textContent = "solved";
+    hoverText.textContent = `Challenge cleared: the hidden word was "${state.challenge.secretWord}".`;
+  } else {
+    challengeStatus.textContent = "miss";
+    hoverText.textContent = "Not quite. Keep tuning and inspect the packet stack.";
+  }
+});
 shareButton.addEventListener("click", shareStation);
 fullscreenButton.addEventListener("click", toggleFullscreen);
 gallerySaveButton.addEventListener("click", saveToGallery);
